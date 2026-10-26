@@ -83,6 +83,11 @@ svg.hemi { width: 100%; height: auto; display: block; }
 .threshold-risks { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 6px; font-size: 13px; color: var(--muted); }
 .threshold-risks b { color: var(--fg); }
 .chip.below-threshold { opacity: .6; border-style: dashed; }
+.party-query { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 14px; }
+.party-query input { width: 72px; font: 500 14px var(--mono); padding: 7px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
+.party-query-result { display: grid; grid-template-columns: minmax(200px, 1fr) 2fr; gap: 16px; align-items: start; padding-top: 10px; }
+@media (max-width: 720px) { .party-query-result { grid-template-columns: 1fr; } }
+.party-trend-chart { position: relative; height: 200px; }
 .chance-trend-chart { position: relative; height: 110px; }
 .likely { color: var(--good); } .possible { color: var(--warn); } .unlikely { color: var(--bad); }
 .signals { margin-top: 14px; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
@@ -208,6 +213,27 @@ input[type=text] { font: 13px var(--mono); width: 100%; max-width: 420px; paddin
   </section>
 
   <section class="panel blocs" id="blocs"><h2>Blocs</h2></section>
+
+  <section class="panel">
+    <h2>One party</h2>
+    <div class="party-query">
+      <label for="queryParty">Chance that</label>
+      <select id="queryParty" autocomplete="off"></select>
+      <label for="querySeats">wins at least</label>
+      <input id="querySeats" type="number" min="1" max="120" step="1" autocomplete="off">
+      <span>seats</span>
+    </div>
+    <div class="party-query-result">
+      <div class="bigchance">
+        <b id="queryChance"></b>
+        <span id="queryText"></span>
+      </div>
+      <div class="chance-trend" id="queryTrendWrap" hidden>
+        <div class="status" id="queryTrendTitle"></div>
+        <div class="party-trend-chart"><canvas id="queryTrend" aria-label="Average simulated seats over time"></canvas></div>
+      </div>
+    </div>
+  </section>
 
   <section class="panel">
     <h2>Market signals</h2>
@@ -788,6 +814,7 @@ function render() {
   renderTable(rows, colors);
   renderCards();
   renderCoalition(rows, colors);
+  renderPartySeatQuery();
   renderTrend();
   const skippedBox = document.getElementById("skippedBox");
   skippedBox.hidden = !lastData.skipped.length;
@@ -1475,6 +1502,113 @@ function renderCoalitionTrend() {
   }
 }
 
+const PARTY_QUERY_DEFAULT = { key: "likud", seats: 25 };
+let partyTrendCache = null;
+let partyTrendChart = null;
+
+function partySeatQuery() {
+  const key = store.get("kmp-query-party", PARTY_QUERY_DEFAULT.key);
+  const seats = Math.min(120, Math.max(1, Math.round(Number(store.get("kmp-query-seats", PARTY_QUERY_DEFAULT.seats)) || PARTY_QUERY_DEFAULT.seats)));
+  return { key, seats };
+}
+
+function liveSeatsOf(key) {
+  const { keys, draws } = simulatedKnessets();
+  const index = keys.indexOf(key);
+  return index < 0 ? [] : draws.map(draw => Math.round(draw[index]));
+}
+
+function chanceOfAtLeast({ seatsByDraw, seats }) {
+  return seatsByDraw.length ? seatsByDraw.filter(drawn => drawn >= seats).length / seatsByDraw.length : 0;
+}
+
+function seatsByDrawAtSnapshot({ parties, key }) {
+  const index = parties.findIndex(v => v.party.key === key);
+  if (index < 0) return [];
+  return Array.from({ length: COALITION_TREND_DRAWS }, () => {
+    const drawn = parties.map(sampleSeats);
+    const total = drawn.reduce((a, b) => a + b, 0);
+    return total > 0 ? Math.round((drawn[index] / total) * 120) : 0;
+  });
+}
+
+const averageSeatsOf = seatsByDraw => (seatsByDraw.length ? seatsByDraw.reduce((a, b) => a + b, 0) / seatsByDraw.length : 0);
+
+function partyTrendPoints({ key, seats }) {
+  if (!trendData?.snapshots?.length) return null;
+  const cacheKey = `${key}|${seats}|${trendData.end}`;
+  if (partyTrendCache?.cacheKey === cacheKey) return partyTrendCache.points;
+  const lastIndex = trendData.snapshots.length - 1;
+  const points = trendData.snapshots.map((snapshot, index) => {
+    const seatsByDraw = index === lastIndex ? liveSeatsOf(key) : seatsByDrawAtSnapshot({ parties: snapshot.parties, key });
+    return { x: snapshot.t, averageSeats: averageSeatsOf(seatsByDraw), chance: chanceOfAtLeast({ seatsByDraw, seats }) };
+  });
+  partyTrendCache = { cacheKey, points };
+  return points;
+}
+
+function renderPartySeatQuery() {
+  if (!lastData) return;
+  const { rows, colors } = currentView();
+  const query = partySeatQuery();
+  const partySelect = document.getElementById("queryParty");
+  const partiesBySeats = [...rows].sort((a, b) => b.seats - a.seats);
+  const selectedKey = partiesBySeats.some(r => r.v.party.key === query.key) ? query.key : partiesBySeats[0]?.v.party.key;
+  partySelect.replaceChildren(...partiesBySeats.map(r => new Option(r.v.party.name, r.v.party.key, false, r.v.party.key === selectedKey)));
+  const seatsInput = document.getElementById("querySeats");
+  if (document.activeElement !== seatsInput) seatsInput.value = query.seats;
+  const row = rows.find(r => r.v.party.key === selectedKey);
+  if (!row) return;
+
+  const seatsByDraw = liveSeatsOf(selectedKey);
+  const chance = chanceOfAtLeast({ seatsByDraw, seats: query.seats });
+  const sortedSeats = [...seatsByDraw].sort((a, b) => a - b);
+  const seatsAtShare = share => sortedSeats[Math.min(sortedSeats.length - 1, Math.floor(share * sortedSeats.length))] ?? 0;
+  const passChance = seatsByDraw.filter(drawn => drawn > 0).length / Math.max(1, seatsByDraw.length);
+  const chanceNumber = document.getElementById("queryChance");
+  chanceNumber.textContent = chancePct(chance);
+  chanceNumber.className = likelihoodClass(chance);
+  document.getElementById("queryText").textContent = `chance ${row.v.party.name} wins ${query.seats}+ seats, from ${SIMULATION_DRAWS.toLocaleString()} simulated results. Averages ${averageSeatsOf(seatsByDraw).toFixed(1)} seats; 8 in 10 results fall between ${seatsAtShare(0.1)} and ${seatsAtShare(0.9)}. Passes the threshold in ${chancePct(passChance)}.`;
+
+  const wrap = document.getElementById("queryTrendWrap");
+  const points = typeof Chart !== "undefined" ? partyTrendPoints({ key: selectedKey, seats: query.seats }) : null;
+  wrap.hidden = !points;
+  if (!points) return;
+  document.getElementById("queryTrendTitle").textContent = `Average simulated seats over the last ${formatSpan(currentTrendWindow().spanMs)}, dashed line at ${query.seats}`;
+  const fg = cssVar("--muted"), grid = cssVar("--line");
+  const partyColor = colors[selectedKey];
+  const highestSeats = Math.max(query.seats, ...points.map(point => point.averageSeats));
+  const options = {
+    responsive: true, maintainAspectRatio: false, animation: false,
+    interaction: { mode: "index", intersect: false },
+    scales: {
+      x: { type: "linear", min: points[0].x, max: points.at(-1).x, ticks: { color: fg, maxTicksLimit: 5, callback: formatTrendTick }, grid: { display: false } },
+      y: { min: 0, suggestedMax: Math.ceil(highestSeats + 2), ticks: { color: fg, maxTicksLimit: 5 }, grid: { color: grid } },
+    },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        filter: item => item.datasetIndex === 0,
+        callbacks: {
+          title: items => new Date(items[0].parsed.x).toLocaleString(),
+          label: item => [`Average seats: ${item.parsed.y.toFixed(1)}`, `Chance of ${query.seats}+: ${chancePct(points[item.dataIndex].chance)}`],
+        },
+      },
+    },
+  };
+  const datasets = [
+    { data: points.map(point => ({ x: point.x, y: point.averageSeats })), borderColor: partyColor, backgroundColor: partyColor, pointRadius: 0, borderWidth: 2, tension: 0.3 },
+    { data: [{ x: points[0].x, y: query.seats }, { x: points.at(-1).x, y: query.seats }], borderColor: fg, borderDash: [6, 4], borderWidth: 1, pointRadius: 0 },
+  ];
+  if (partyTrendChart) {
+    partyTrendChart.data.datasets = datasets;
+    partyTrendChart.options = options;
+    partyTrendChart.update("none");
+  } else {
+    partyTrendChart = new Chart(document.getElementById("queryTrend"), { type: "line", data: { datasets }, options });
+  }
+}
+
 function renderTrend() {
   if (!trendData || typeof Chart === "undefined") return;
   if (trendData.mode !== document.getElementById("mode").value) computeTrend();
@@ -1514,6 +1648,7 @@ function renderTrend() {
     chart = new Chart(document.getElementById("trend"), { type: "line", data: { datasets }, options });
   }
   renderCoalitionTrend();
+  renderPartySeatQuery();
 }
 
 function setTrendView(view) {
@@ -1530,6 +1665,12 @@ document.getElementById("trendBlocs").addEventListener("click", () => setTrendVi
 const proxyInput = document.getElementById("proxy");
 proxyInput.value = store.get("kmp-proxy", "");
 proxyInput.addEventListener("change", () => { store.set("kmp-proxy", proxyInput.value); refresh(); });
+document.getElementById("queryParty").addEventListener("change", event => { store.set("kmp-query-party", event.target.value); renderPartySeatQuery(); });
+document.getElementById("querySeats").addEventListener("input", event => {
+  if (event.target.value === "") return;
+  store.set("kmp-query-seats", event.target.value);
+  renderPartySeatQuery();
+});
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", render);
 const daysToElection = Math.round((new Date(`${ELECTION_DAY}T00:00:00`) - new Date(new Date().toDateString())) / 86400e3);
 document.getElementById("countdown").textContent = daysToElection === 0 ? " (today)" : daysToElection === 1 ? " (tomorrow)" : daysToElection > 1 ? ` (in ${daysToElection} days)` : "";
