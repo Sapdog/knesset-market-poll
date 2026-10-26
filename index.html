@@ -2,8 +2,24 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Knesset Market Poll</title>
+<meta name="description" content="Live Knesset seat forecast from Polymarket and Manifold prices: a 120-seat map, a coalition builder with the chance of reaching 61, and how it moved over the last hours.">
+<meta name="theme-color" content="#10141a">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://sapdog.github.io/knesset-market-poll/">
+<meta property="og:title" content="Knesset Market Poll: who reaches 61?">
+<meta property="og:description" content="Live Knesset seats implied by prediction-market prices. Build a coalition and see its chance of 61. Election day 27 Oct 2026.">
+<meta property="og:image" content="https://sapdog.github.io/knesset-market-poll/preview.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="A 120-seat Knesset hemicycle colored by party">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Knesset Market Poll: who reaches 61?">
+<meta name="twitter:description" content="Live Knesset seats implied by prediction-market prices. Build a coalition and see its chance of 61.">
+<meta name="twitter:image" content="https://sapdog.github.io/knesset-market-poll/preview.png">
+<link rel="icon" type="image/png" href="icon-180.png">
+<link rel="apple-touch-icon" href="icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&family=Fraunces:opsz,wght@9..144,600&display=swap">
 <style>
@@ -50,7 +66,7 @@ td select { font-size: 12px; padding: 3px 6px; }
 .pbar .col { display: flex; flex-direction: column; justify-content: flex-end; align-items: stretch; width: 100%; height: 230px; border-bottom: 1px solid var(--line); }
 .pbar .n { font: 600 22px/1.1 var(--mono); font-variant-numeric: tabular-nums; }
 .pbar .d { font: 11px/1.4 var(--mono); color: var(--muted); min-height: 16px; margin-bottom: 4px; }
-.pbar .col i { display: block; width: 100%; border-radius: 4px 4px 0 0; }
+.pbar .col i { display: block; width: 100%; height: max(3px, calc(var(--share, 0) * 180px)); border-radius: 4px 4px 0 0; }
 .pbar .label { display: grid; justify-items: center; gap: 6px; }
 .pbar .name { font: 500 12px/1.25 var(--body); min-height: 2.5em; text-wrap: balance; }
 .logo { width: 36px; height: 36px; border-radius: 50%; object-fit: contain; background: #fff; border: 1px solid var(--line); flex: none; }
@@ -155,6 +171,90 @@ details summary { cursor: pointer; color: var(--fg); font-weight: 500; }
 code { font: 13px var(--mono); }
 input[type=text] { font: 13px var(--mono); width: 100%; max-width: 420px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
 .skipped li { font: 12px var(--mono); }
+
+.jump { display: none; }
+.coalition-summary { display: none; }
+.for-touch, .for-phone { display: none; }
+.section-toggle > summary { list-style: none; display: flex; align-items: center; justify-content: space-between; }
+.section-toggle > summary::-webkit-details-marker { display: none; }
+.section-toggle > summary::after { content: "Show"; font: 500 13px var(--body); color: var(--accent); }
+.section-toggle[open] > summary::after { content: "Hide"; }
+.section-toggle > summary h2 { margin: 0; }
+.section-toggle[open] > summary { margin-bottom: 12px; }
+#candidateCard .card-actions { display: none; }
+#candidateCard.pinned .card-actions { display: flex; gap: 8px; margin-top: 6px; }
+#candidateCard.pinned .hint { display: none; }
+#candidateCard .toggle-party { flex: 1; border-color: var(--accent); color: var(--accent); }
+
+@media (hover: none) {
+  .for-mouse { display: none; }
+  .for-touch { display: inline; }
+}
+
+@media (hover: none), (max-width: 640px) {
+  #candidateCard.pinned { left: max(10px, env(safe-area-inset-left, 0px)) !important; right: max(10px, env(safe-area-inset-right, 0px)); top: auto !important; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); width: auto; align-items: flex-start; z-index: 30; }
+}
+
+@media (pointer: coarse) {
+  button, select { min-height: 40px; }
+  svg.hemi circle:hover { opacity: inherit; }
+}
+
+@media (max-width: 640px) {
+  body { font-size: 15px; }
+  .wrap { padding-block: 12px 32px; gap: 14px; }
+  h1 { font-size: 26px; }
+  header { align-items: start; }
+  header .controls { width: 100%; }
+  header select { flex: 1; min-width: 0; }
+  .panel { padding: 14px; border-radius: 12px; }
+  select, input, .party-query input { font-size: 16px; }
+
+  .jump { display: flex; gap: 6px; overflow-x: auto; position: sticky; top: 0; z-index: 20; margin-inline: -16px; padding: 8px 16px; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); scrollbar-width: none; }
+  .jump::-webkit-scrollbar { display: none; }
+  .jump a { flex: none; font: 500 13px var(--body); color: var(--fg); text-decoration: none; padding: 7px 12px; border: 1px solid var(--line); border-radius: 99px; background: var(--panel); }
+  section[id], #blocs { scroll-margin-top: 60px; }
+
+  .pollwrap { overflow: visible; }
+  .poll { grid-auto-flow: row; grid-auto-columns: auto; gap: 8px; }
+  .pbar { display: grid; grid-template-columns: 26px 7.2em 1fr 2.2em 3.4em; grid-template-rows: auto; align-items: center; gap: 8px; text-align: left; justify-items: stretch; }
+  .pbar .col, .pbar .label { display: contents; }
+  .pbar .logo { order: 1; width: 26px; height: 26px; }
+  .pbar .name { order: 2; min-height: 0; font-size: 13px; line-height: 1.2; text-wrap: pretty; }
+  .pbar .col i { order: 3; height: 14px; width: max(3px, calc(var(--share, 0) * 100%)); border-radius: 0 4px 4px 0; }
+  .pbar .n { order: 4; font-size: 17px; text-align: right; }
+  .pbar .d { order: 5; min-height: 0; margin: 0; text-align: left; }
+  .pbar.picked .col i { box-shadow: 0 0 0 2px var(--fg); }
+
+  .panel-head { margin-bottom: 8px; }
+  .panel-head .status { width: 100%; }
+
+  .coalition { gap: 14px; }
+  .chips { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .chip { min-height: 44px; padding: 6px 10px 6px 8px; gap: 6px; font-size: 13px; text-align: left; border-radius: 10px; }
+  .chip > span:not(.sw) { min-width: 0; line-height: 1.2; overflow-wrap: anywhere; }
+  .chip b { margin-left: auto; padding-left: 4px; }
+  .chip .logo.sm { width: 20px; height: 20px; }
+  .coalition-summary:not([hidden]) { display: flex; position: sticky; bottom: calc(8px + env(safe-area-inset-bottom, 0px)); z-index: 15; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; border-radius: 12px; background: var(--panel); border: 1px solid var(--accent); box-shadow: 0 6px 20px rgb(0 0 0 / 0.25); font: 600 15px var(--mono); }
+  .coalition-summary small { font: 400 12px var(--body); color: var(--muted); }
+  .count b { font-size: 40px; }
+  .bigchance b { font-size: 48px; }
+
+  .bloc b { font-size: 22px; }
+  .signals { grid-template-columns: 1fr 1fr; }
+  .signal b { font-size: 20px; }
+  .chartbox { height: 300px; }
+  .party-query { font-size: 15px; }
+
+  .parties-table th:nth-child(n+4):not(:nth-child(7)), .parties-table td:nth-child(n+4):not(:nth-child(7)) { display: none; }
+  .parties-table th, .parties-table td { padding: 8px 6px; white-space: normal; }
+  .for-phone { display: inline; }
+  .cards { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 640px) and (orientation: landscape) {
+  .for-phone { display: none; }
+}
 </style>
 </head>
 <body>
@@ -167,33 +267,43 @@ input[type=text] { font: 13px var(--mono); width: 100%; max-width: 420px; paddin
     <div class="controls">
       <label for="mode" class="status">Model</label>
       <select id="mode" autocomplete="off">
-        <option value="feasible" selected>Likely Knesset (threshold-aware)</option>
-        <option value="expected">Expected seats (SymbioLAB method)</option>
-        <option value="blend">Blend: seat ranges + vote share</option>
+        <option value="feasible" selected>Likely Knesset</option>
+        <option value="expected">Expected seats</option>
+        <option value="blend">Seat ranges + vote share</option>
       </select>
       <button id="refresh" type="button">Refresh</button>
     </div>
   </header>
   <div class="status"><span id="status">Loading Polymarket…</span> <span id="liveTicker" class="live" hidden></span></div>
+  <nav class="jump" aria-label="Sections">
+    <a href="#seatsSection">Seats</a>
+    <a href="#mapSection">Seat map</a>
+    <a href="#coalitionSection">Coalition</a>
+    <a href="#blocs">Blocs</a>
+    <a href="#partySection">One party</a>
+    <a href="#trendSection">Trend</a>
+    <a href="#tableSection">Table</a>
+  </nav>
 
-  <section class="panel">
+  <section class="panel" id="seatsSection">
     <div class="panel-head"><h2>Seats per party</h2><span class="status" id="deltaNote">Small number: change over the last 24 hours</span></div>
     <div class="pollwrap"><div class="poll" id="poll"></div></div>
     <p class="status" id="pollNote"></p>
   </section>
 
-  <section class="panel">
-    <div class="panel-head"><h2>Seat map</h2><span class="status">Click a seat to add its party to the coalition below</span></div>
+  <section class="panel" id="mapSection">
+    <div class="panel-head"><h2>Seat map</h2><span class="status"><span class="for-mouse">Hover a seat to see who sits there, click it to add its party to the coalition below</span><span class="for-touch">Tap a seat to see who sits there</span></span></div>
     <div class="hemiwrap"><svg class="hemi" id="hemi" viewBox="-1.08 -1.06 2.16 1.12" role="img" aria-label="Hemicycle of 120 seats"></svg></div>
   </section>
 
-  <section class="panel">
+  <section class="panel" id="coalitionSection">
     <div class="panel-head">
       <h2>Build a coalition</h2>
       <div class="controls" id="presets"></div>
     </div>
     <div class="coalition">
       <div class="chips" id="chips" role="group" aria-label="Parties: tap to add or remove"></div>
+      <div class="coalition-summary" id="coalSummary" aria-live="polite" hidden></div>
       <div class="tally">
         <div class="count"><b id="coalSeats">0</b><span>/ 61</span></div>
         <div class="meter"><i id="coalMeter"></i><span class="mark"></span></div>
@@ -214,13 +324,13 @@ input[type=text] { font: 13px var(--mono); width: 100%; max-width: 420px; paddin
 
   <section class="panel blocs" id="blocs"><h2>Blocs</h2></section>
 
-  <section class="panel">
+  <section class="panel" id="partySection">
     <h2>One party</h2>
     <div class="party-query">
       <label for="queryParty">Chance that</label>
       <select id="queryParty" autocomplete="off"></select>
       <label for="querySeats">wins at least</label>
-      <input id="querySeats" type="number" min="1" max="120" step="1" autocomplete="off">
+      <input id="querySeats" type="number" inputmode="numeric" min="1" max="120" step="1" autocomplete="off">
       <span>seats</span>
     </div>
     <div class="party-query-result">
@@ -240,7 +350,7 @@ input[type=text] { font: 13px var(--mono); width: 100%; max-width: 420px; paddin
     <div class="signals" id="signals"></div>
   </section>
 
-  <section class="panel">
+  <section class="panel" id="trendSection">
     <div class="panel-head">
       <h2 id="trendTitle">Trend</h2>
       <div class="controls">
@@ -253,19 +363,21 @@ input[type=text] { font: 13px var(--mono); width: 100%; max-width: 420px; paddin
     <div class="chartbox"><canvas id="trend" aria-label="Seats over the last 7 days"></canvas></div>
   </section>
 
-  <section class="panel">
+  <section class="panel" id="tableSection">
     <h2>Parties</h2>
-    <div class="tablewrap"><table>
+    <div class="tablewrap"><table class="parties-table">
       <thead><tr><th>Party</th><th class="num">Seats</th><th class="num" id="deltaHeader">Change</th><th class="num">Seat ranges</th><th class="num">Vote share</th><th class="num">Kalshi</th><th class="num">P(pass)</th><th>Top bracket</th><th class="num">Volume</th><th>Depth</th><th>Bloc</th></tr></thead>
       <tbody id="rows"></tbody>
     </table></div>
-    <p class="status">Seat ranges, Vote share and Kalshi are each source's own estimate before scaling to 120. A dash means that source has no market for the party.</p>
+    <p class="status">Seat ranges, Vote share and Kalshi are each source's own estimate before scaling to 120. A dash means that source has no market for the party.<span class="for-phone"> Turn your phone sideways for every column.</span></p>
   </section>
 
   <section class="panel">
-    <h2>Other markets</h2>
-    <div class="cards" id="cards"></div>
-    <div id="cardsStatus" class="status"></div>
+    <details class="section-toggle" id="otherMarkets" open>
+      <summary><h2>Other markets</h2></summary>
+      <div class="cards" id="cards"></div>
+      <div id="cardsStatus" class="status"></div>
+    </details>
   </section>
 
   <section class="panel">
@@ -833,7 +945,6 @@ function logoFor(v, size) {
 
 function renderPoll(rows, colors) {
   const max = Math.max(...rows.map(r => r.seats), 1);
-  const BAR_MAX_PX = 180;
   const picked = pickedParties();
   const poll = document.getElementById("poll");
   poll.classList.toggle("has-picked", picked.size > 0);
@@ -847,7 +958,7 @@ function renderPoll(rows, colors) {
     div.querySelector(".n").textContent = r.seats > 0 ? r.seats : "—";
     const d = div.querySelector(".d"); d.textContent = txt; if (cls) d.classList.add(cls);
     const bar = div.querySelector("i");
-    bar.style.height = `${Math.max(3, (r.seats / max) * BAR_MAX_PX)}px`;
+    bar.style.setProperty("--share", String(r.seats / max));
     bar.style.background = colors[r.v.party.key];
     div.querySelector(".label").prepend(logoFor(r.v));
     div.querySelector(".name").textContent = r.v.party.name;
@@ -1019,19 +1130,20 @@ const PRESETS = [
   { label: "Clear", pick: () => [] },
 ];
 
-const pickedParties = () => new Set(store.get("kmp-coalition", []));
+let pickedPartyKeys = [];
+const pickedParties = () => new Set(pickedPartyKeys);
 
 function togglePicked(key) {
   const picked = pickedParties();
   picked.has(key) ? picked.delete(key) : picked.add(key);
-  store.set("kmp-coalition", [...picked]);
+  pickedPartyKeys = [...picked];
   render();
 }
 
 function renderCoalition(rows, colors) {
   const picked = pickedParties();
   const inKnesset = rows.filter(r => r.seats > 0);
-  const save = keys => { store.set("kmp-coalition", [...keys]); render(); };
+  const save = keys => { pickedPartyKeys = [...keys]; render(); };
 
   document.getElementById("presets").replaceChildren(...PRESETS.map(p => {
     const b = document.createElement("button");
@@ -1075,9 +1187,25 @@ function renderCoalition(rows, colors) {
   const chanceNumber = document.getElementById("coalChance");
   chanceNumber.textContent = chance === null ? "" : chancePct(chance);
   chanceNumber.className = chance === null ? "" : likelihoodClass(chance);
+  renderCoalitionSummary({ total, chance });
   renderThresholdRisks(members);
   renderCoalitionTrend();
   renderSignals();
+}
+
+function renderCoalitionSummary({ total, chance }) {
+  const summary = document.getElementById("coalSummary");
+  summary.hidden = chance === null;
+  if (chance === null) return;
+  const seats = document.createElement("span");
+  seats.textContent = `${total} / 61`;
+  const chanceLine = document.createElement("span");
+  chanceLine.className = likelihoodClass(chance);
+  chanceLine.append(`${chancePct(chance)} `);
+  const chanceLabel = document.createElement("small");
+  chanceLabel.textContent = "chance of 61+";
+  chanceLine.append(chanceLabel);
+  summary.replaceChildren(seats, chanceLine);
 }
 
 const chancePct = p => (p > 0 && p < 0.005 ? "<1%" : p > 0.995 && p < 1 ? ">99%" : pct(p));
@@ -1216,9 +1344,13 @@ function candidateCardElement() {
     card = document.createElement("div");
     card.id = "candidateCard";
     card.setAttribute("role", "tooltip");
-    card.innerHTML = `<a class="photo" target="_blank" rel="noopener"></a><div class="details"><a class="name" target="_blank" rel="noopener"></a><div class="description"></div><div class="party"></div><div class="slot"></div><div class="hint"></div></div>`;
+    card.innerHTML = `<a class="photo" target="_blank" rel="noopener"></a><div class="details"><a class="name" target="_blank" rel="noopener"></a><div class="description"></div><div class="party"></div><div class="slot"></div><div class="hint"></div><div class="card-actions"><button type="button" class="toggle-party"></button><button type="button" class="close-card">Close</button></div></div>`;
     card.addEventListener("mouseenter", () => clearTimeout(hideCandidateCardTimer));
-    card.addEventListener("mouseleave", hideCandidateCard);
+    card.addEventListener("mouseleave", () => { if (!card.classList.contains("pinned")) hideCandidateCard(); });
+    card.querySelector(".close-card").addEventListener("click", closeCandidateCard);
+    document.addEventListener("click", event => {
+      if (card.classList.contains("pinned") && !event.target.closest("#candidateCard, svg.hemi circle")) closeCandidateCard();
+    });
     document.body.append(card);
   }
   return card;
@@ -1235,12 +1367,20 @@ function setCandidateLinks({ card, url, label }) {
   }
 }
 
-function showCandidateCard({ row, listPosition, isPicked, anchor }) {
+let lastPointerType = "mouse";
+document.addEventListener("pointerdown", event => { lastPointerType = event.pointerType; }, true);
+
+function showCandidateCard({ row, listPosition, isPicked, anchor, isPinned = false }) {
   clearTimeout(hideCandidateCardTimer);
   const seatToken = ++hoveredSeatToken;
   const party = row.v.party;
   const name = CANDIDATE_LISTS[party.key]?.[listPosition - 1];
   const card = candidateCardElement();
+  card.classList.toggle("pinned", isPinned);
+  card.setAttribute("role", isPinned ? "dialog" : "tooltip");
+  const toggleButton = card.querySelector(".toggle-party");
+  toggleButton.textContent = isPicked ? `Remove ${party.name} from the coalition` : `Add ${party.name} to the coalition`;
+  toggleButton.onclick = () => { closeCandidateCard(); togglePicked(party.key); };
   const photo = card.querySelector(".photo");
   photo.replaceChildren(document.createTextNode(name ? initialsOf(name) : "?"));
   photo.style.background = `hsl(${party.hue} 45% 45%)`;
@@ -1275,10 +1415,13 @@ function showCandidateCard({ row, listPosition, isPicked, anchor }) {
 
 function hideCandidateCard() {
   clearTimeout(hideCandidateCardTimer);
-  hideCandidateCardTimer = setTimeout(() => {
-    hoveredSeatToken++;
-    document.getElementById("candidateCard")?.classList.remove("visible");
-  }, CANDIDATE_CARD_HIDE_DELAY_MS);
+  hideCandidateCardTimer = setTimeout(closeCandidateCard, CANDIDATE_CARD_HIDE_DELAY_MS);
+}
+
+function closeCandidateCard() {
+  clearTimeout(hideCandidateCardTimer);
+  hoveredSeatToken++;
+  document.getElementById("candidateCard")?.classList.remove("visible", "pinned");
 }
 
 function drawHemicycle(rows, colors) {
@@ -1317,9 +1460,13 @@ function drawHemicycle(rows, colors) {
       const key = owners[i].v.party.key;
       if (picked.has(key)) c.classList.add("picked");
       const seatInfo = { row: owners[i], listPosition: listPositionOfSeat[i], isPicked: picked.has(key) };
-      c.addEventListener("mouseenter", event => showCandidateCard({ ...seatInfo, anchor: event.currentTarget }));
-      c.addEventListener("mouseleave", hideCandidateCard);
-      c.addEventListener("click", () => { hideCandidateCard(); togglePicked(key); });
+      c.addEventListener("pointerenter", event => { if (event.pointerType === "mouse") showCandidateCard({ ...seatInfo, anchor: event.currentTarget }); });
+      c.addEventListener("pointerleave", event => { if (event.pointerType === "mouse") hideCandidateCard(); });
+      c.addEventListener("click", event => {
+        if (lastPointerType !== "mouse") return showCandidateCard({ ...seatInfo, anchor: event.currentTarget, isPinned: true });
+        closeCandidateCard();
+        togglePicked(key);
+      });
     }
     return c;
   }));
@@ -1330,7 +1477,7 @@ function drawHemicycle(rows, colors) {
   svg.append(majorityLine);
   const hasMajority = pickedSeats >= 61;
   const centerLabels = picked.size
-    ? [[`${pickedSeats} seats`, -0.2, "0.1", "--fg"], [hasMajority ? `majority, ${pickedSeats - 60} to spare` : `${61 - pickedSeats} short of 61`, -0.06, "0.065", hasMajority ? "--good" : "--bad"]]
+    ? [[`${pickedSeats} seats`, -0.2, "0.1", "--fg"], [pickedSeats === 61 ? "bare majority" : hasMajority ? `majority, ${pickedSeats - 61} to spare` : `${61 - pickedSeats} short of 61`, -0.06, "0.065", hasMajority ? "--good" : "--bad"]]
     : [["120 seats", -0.2, "0.1", "--muted"], ["61 to govern", -0.06, "0.07", "--muted"]];
   centerLabels.forEach(([text, y, size, colorVar]) => {
     const t = document.createElementNS(ns, "text");
@@ -1466,11 +1613,15 @@ function coalitionChanceOverTime(keys) {
 }
 
 function formatTrendTick(timeMs) {
-  const isShortWindow = currentTrendWindow().spanMs <= 24 * 60 * 60 * 1000;
-  return isShortWindow
-    ? new Date(timeMs).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
-    : new Date(timeMs).toLocaleDateString(undefined, { weekday: "short", day: "numeric" });
+  const spanMs = currentTrendWindow().spanMs;
+  const time = new Date(timeMs);
+  const clock = time.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  if (spanMs <= 12 * HOUR_MS) return clock;
+  if (spanMs <= 72 * HOUR_MS) return `${time.toLocaleDateString(undefined, { weekday: "short" })} ${clock}`;
+  return time.toLocaleDateString(undefined, { weekday: "short", day: "numeric" });
 }
+
+const isPhoneWidth = () => matchMedia("(max-width: 640px)").matches;
 
 function renderCoalitionTrend() {
   const wrap = document.getElementById("coalTrendWrap");
@@ -1484,7 +1635,7 @@ function renderCoalitionTrend() {
     responsive: true, maintainAspectRatio: false, animation: false,
     interaction: { mode: "index", intersect: false },
     scales: {
-      x: { type: "linear", min: points[0].x, max: points.at(-1).x, ticks: { color: fg, maxTicksLimit: 5, callback: formatTrendTick }, grid: { display: false } },
+      x: { type: "linear", min: points[0].x, max: points.at(-1).x, ticks: { color: fg, maxTicksLimit: isPhoneWidth() ? 3 : 5, maxRotation: 0, callback: formatTrendTick }, grid: { display: false } },
       y: { min: 0, max: 100, ticks: { color: fg, maxTicksLimit: 3, callback: v => `${v}%` }, grid: { color: grid } },
     },
     plugins: {
@@ -1582,7 +1733,7 @@ function renderPartySeatQuery() {
     responsive: true, maintainAspectRatio: false, animation: false,
     interaction: { mode: "index", intersect: false },
     scales: {
-      x: { type: "linear", min: points[0].x, max: points.at(-1).x, ticks: { color: fg, maxTicksLimit: 5, callback: formatTrendTick }, grid: { display: false } },
+      x: { type: "linear", min: points[0].x, max: points.at(-1).x, ticks: { color: fg, maxTicksLimit: isPhoneWidth() ? 3 : 5, maxRotation: 0, callback: formatTrendTick }, grid: { display: false } },
       y: { min: 0, suggestedMax: Math.ceil(highestSeats + 2), ticks: { color: fg, maxTicksLimit: 5 }, grid: { color: grid } },
     },
     plugins: {
@@ -1632,11 +1783,11 @@ function renderTrend() {
     responsive: true, maintainAspectRatio: false, animation: false,
     interaction: { mode: "index", intersect: false },
     scales: {
-      x: { type: "linear", ticks: { color: fg, maxTicksLimit: 8, callback: v => new Date(v).toLocaleDateString(undefined, { weekday: "short", day: "numeric" }) }, grid: { color: grid } },
-      y: { beginAtZero: trendView === "parties", ticks: { color: fg }, grid: { color: grid }, title: { display: true, text: "Seats", color: fg } },
+      x: { type: "linear", min: datasets[0]?.data[0]?.x, max: datasets[0]?.data.at(-1)?.x, ticks: { color: fg, maxTicksLimit: isPhoneWidth() ? 4 : 8, maxRotation: 0, callback: formatTrendTick }, grid: { color: grid } },
+      y: { beginAtZero: trendView === "parties", ticks: { color: fg }, grid: { color: grid }, title: { display: !isPhoneWidth(), text: "Seats", color: fg } },
     },
     plugins: {
-      legend: { position: "bottom", labels: { color: fg, boxWidth: 10, boxHeight: 10 } },
+      legend: { position: "bottom", labels: { color: fg, boxWidth: isPhoneWidth() ? 8 : 10, boxHeight: isPhoneWidth() ? 8 : 10, padding: isPhoneWidth() ? 6 : 10, font: { size: isPhoneWidth() ? 11 : 12 } } },
       tooltip: { callbacks: { title: items => new Date(items[0].parsed.x).toLocaleString(), label: c => `${c.dataset.label}: ${c.parsed.y.toFixed(1)}` } },
     },
   };
@@ -1674,6 +1825,7 @@ document.getElementById("querySeats").addEventListener("input", event => {
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", render);
 const daysToElection = Math.round((new Date(`${ELECTION_DAY}T00:00:00`) - new Date(new Date().toDateString())) / 86400e3);
 document.getElementById("countdown").textContent = daysToElection === 0 ? " (today)" : daysToElection === 1 ? " (tomorrow)" : daysToElection > 1 ? ` (in ${daysToElection} days)` : "";
+if (isPhoneWidth()) document.getElementById("otherMarkets").open = false;
 renderTrendWindows();
 refresh();
 setInterval(refresh, REFRESH_MS);
