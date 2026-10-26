@@ -1,0 +1,1551 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Knesset Market Poll</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600&family=Fraunces:opsz,wght@9..144,600&display=swap">
+<style>
+/* Layout: one column; poll bars first, then seat map + blocs, trends, party table, other markets, method notes */
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --fg: #18202b; --muted: #5d6878; --line: #dde2e9;
+  --accent: #2a5bd7; --warn: #b26a00; --bad: #b3261e; --good: #1f8a70;
+  --coal: #2a5bd7; --opp: #1f8a70; --arab: #b0702a; --other: #8a8f99;
+  --display: "Fraunces", Georgia, serif;
+  --body: "IBM Plex Sans", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #10141a; --panel: #171c24; --fg: #e6e9ee; --muted: #9aa4b2; --line: #2a313c;
+    --accent: #7aa2ff; --warn: #e0a040; --bad: #ff8a80; --good: #4cc2a0;
+    --coal: #6f95ff; --opp: #4cc2a0; --arab: #d39a52; --other: #8f96a3; color-scheme: dark; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 var(--body); }
+.wrap { max-width: 1040px; margin: 0 auto; padding-block: 28px 48px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 20px; }
+header { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px; }
+h1 { font: 600 30px/1.1 var(--display); margin: 0; text-wrap: balance; }
+h2 { font: 600 13px/1.2 var(--body); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 12px; }
+h3 { font: 600 14px var(--body); margin: 0 0 6px; }
+.sub { color: var(--muted); margin: 4px 0 0; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+button, select { font: 500 14px var(--body); color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 7px 12px; cursor: pointer; }
+button:hover, select:hover { border-color: var(--accent); }
+button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+td select { font-size: 12px; padding: 3px 6px; }
+.status { font: 12px var(--mono); color: var(--muted); }
+.status.err { color: var(--bad); }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px; min-width: 0; }
+.panel-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 12px; }
+.panel-head h2 { margin: 0; }
+.top { display: grid; grid-template-columns: 1.4fr 1fr; gap: 20px; }
+@media (max-width: 760px) { .top { grid-template-columns: 1fr; } }
+
+.pollwrap { overflow-x: auto; }
+.poll { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(76px, 1fr); align-items: start; gap: 10px; }
+.pbar { display: grid; grid-template-rows: 230px auto; gap: 8px; text-align: center; justify-items: center; }
+.pbar .col { display: flex; flex-direction: column; justify-content: flex-end; align-items: stretch; width: 100%; height: 230px; border-bottom: 1px solid var(--line); }
+.pbar .n { font: 600 22px/1.1 var(--mono); font-variant-numeric: tabular-nums; }
+.pbar .d { font: 11px/1.4 var(--mono); color: var(--muted); min-height: 16px; margin-bottom: 4px; }
+.pbar .col i { display: block; width: 100%; border-radius: 4px 4px 0 0; }
+.pbar .label { display: grid; justify-items: center; gap: 6px; }
+.pbar .name { font: 500 12px/1.25 var(--body); min-height: 2.5em; text-wrap: balance; }
+.logo { width: 36px; height: 36px; border-radius: 50%; object-fit: contain; background: #fff; border: 1px solid var(--line); flex: none; }
+.logo.sm { width: 22px; height: 22px; }
+.logo.blank { background: var(--line); }
+.live { display: inline-flex; align-items: center; gap: 6px; }
+.live::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--good); animation: pulse 2s infinite; }
+@keyframes pulse { 50% { opacity: .3; } }
+@media (prefers-reduced-motion: reduce) { .live::before { animation: none; } }
+.up { color: var(--good); } .down { color: var(--bad); }
+
+svg.hemi { width: 100%; height: auto; display: block; }
+.hemiwrap { max-width: 760px; margin: 0 auto; }
+#candidateCard { position: fixed; z-index: 50; display: none; gap: 12px; align-items: center; width: 320px; padding: 12px; background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgb(0 0 0 / 0.18); }
+#candidateCard a.name { color: var(--fg); text-decoration: none; }
+#candidateCard a.name:hover { text-decoration: underline; }
+#candidateCard.visible { display: flex; }
+#candidateCard .photo { flex: none; width: 72px; height: 72px; border-radius: 50%; overflow: hidden; display: grid; place-items: center; color: #fff; font: 600 22px var(--mono); text-decoration: none; }
+#candidateCard .photo img { width: 100%; height: 100%; object-fit: cover; object-position: top; }
+#candidateCard .details { display: grid; gap: 3px; min-width: 0; }
+#candidateCard .name { font-weight: 600; font-size: 15px; }
+#candidateCard .description { font-size: 12px; color: var(--muted); }
+#candidateCard .party { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+#candidateCard .slot { font: 12px var(--mono); color: var(--muted); }
+#candidateCard .hint { font-size: 11px; color: var(--muted); }
+.bigchance { display: grid; gap: 2px; padding-top: 6px; }
+.bigchance b { font: 600 56px/1 var(--mono); font-variant-numeric: tabular-nums; }
+.bigchance span { color: var(--muted); font-size: 13px; }
+.chance-trend { display: grid; gap: 4px; padding-top: 8px; }
+.threshold-risks { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 6px; font-size: 13px; color: var(--muted); }
+.threshold-risks b { color: var(--fg); }
+.chip.below-threshold { opacity: .6; border-style: dashed; }
+.chance-trend-chart { position: relative; height: 110px; }
+.likely { color: var(--good); } .possible { color: var(--warn); } .unlikely { color: var(--bad); }
+.signals { margin-top: 14px; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.signal { border-top: 1px solid var(--line); padding-top: 8px; }
+.signal b { display: block; font: 600 24px var(--mono); }
+.signal span { color: var(--muted); font-size: 12px; }
+svg.hemi circle { cursor: pointer; transition: opacity .2s ease, stroke-width .2s ease; stroke: var(--fg); stroke-width: 0; }
+svg.hemi.has-picked circle { opacity: .16; }
+svg.hemi.has-picked circle.picked { opacity: 1; stroke-width: .008; filter: drop-shadow(0 0 .02px var(--fg)); }
+svg.hemi circle:hover { opacity: 1; }
+.pbar { cursor: pointer; transition: opacity .2s ease; }
+.poll.has-picked .pbar:not(.picked) { opacity: .35; }
+.pbar.picked .col i { box-shadow: 0 0 0 2px var(--fg); }
+@media (prefers-reduced-motion: reduce) { svg.hemi circle, .pbar { transition: none; } }
+.blocs { display: grid; gap: 12px; align-content: start; }
+.bloc { display: grid; grid-template-columns: 12px 1fr auto; gap: 4px 10px; align-items: center; }
+.bloc b { font: 600 26px var(--mono); font-variant-numeric: tabular-nums; }
+.bloc small { grid-column: 2 / 4; color: var(--muted); font-size: 12px; }
+.sw { width: 12px; height: 12px; border-radius: 3px; flex: none; }
+.majority { font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 10px; }
+
+.coalition { display: grid; grid-template-columns: 1.5fr 1fr; gap: 20px; align-items: start; }
+@media (max-width: 760px) { .coalition { grid-template-columns: 1fr; } }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { display: inline-flex; align-items: center; gap: 8px; border-radius: 99px; padding: 6px 12px 6px 8px; }
+.chip b { font: 600 14px var(--mono); }
+.chip[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 14%, var(--panel)); border-color: var(--accent); color: var(--fg); }
+.chip[aria-pressed="false"] { opacity: .75; }
+.tally { display: grid; gap: 8px; }
+.count { display: flex; align-items: baseline; gap: 6px; }
+.count b { font: 600 48px/1 var(--mono); font-variant-numeric: tabular-nums; }
+.count span { font: 500 18px var(--mono); color: var(--muted); }
+.meter { position: relative; height: 12px; background: var(--line); border-radius: 6px; overflow: hidden; }
+.meter i { display: block; height: 100%; background: var(--accent); transition: width .2s ease; }
+.meter .mark { position: absolute; top: 0; bottom: 0; left: calc(61 / 120 * 100%); width: 2px; background: var(--fg); }
+.verdict { font-weight: 600; }
+.verdict.good { color: var(--good); } .verdict.bad { color: var(--bad); }
+@media (prefers-reduced-motion: reduce) { .meter i { transition: none; } }
+.chartbox { position: relative; height: 320px; }
+.tablewrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th { font: 600 12px var(--body); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+td.num, th.num { text-align: right; font-family: var(--mono); }
+td.seats { font: 600 18px var(--mono); text-align: right; }
+.party { display: flex; align-items: center; gap: 8px; }
+.party a { color: inherit; }
+.pill { font: 500 11px var(--body); padding: 2px 7px; border-radius: 99px; border: 1px solid currentColor; }
+.pill.high { color: var(--good); } .pill.med { color: var(--warn); } .pill.low { color: var(--bad); }
+
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.card { border: 1px solid var(--line); border-radius: 8px; padding: 12px; min-width: 0; }
+.card .src { font: 600 11px var(--body); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.card a { color: inherit; }
+.card ol { margin: 6px 0 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+.card li { display: grid; grid-template-columns: 1fr auto; gap: 8px; font-size: 13px; }
+.card li span:last-child { font-family: var(--mono); }
+.card .meta { font: 11px var(--mono); color: var(--muted); margin-top: 6px; }
+
+details { color: var(--muted); }
+details + details { margin-top: 10px; }
+details summary { cursor: pointer; color: var(--fg); font-weight: 500; }
+.notes { max-width: 72ch; display: grid; gap: 8px; margin-top: 10px; }
+.notes p { margin: 0; }
+code { font: 13px var(--mono); }
+input[type=text] { font: 13px var(--mono); width: 100%; max-width: 420px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
+.skipped li { font: 12px var(--mono); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Knesset Market Poll</h1>
+      <p class="sub">120 seats implied by prediction-market prices. Election day: 27 Oct 2026<span id="countdown"></span>.</p>
+    </div>
+    <div class="controls">
+      <label for="mode" class="status">Model</label>
+      <select id="mode" autocomplete="off">
+        <option value="feasible" selected>Likely Knesset (threshold-aware)</option>
+        <option value="expected">Expected seats (SymbioLAB method)</option>
+        <option value="blend">Blend: seat ranges + vote share</option>
+      </select>
+      <button id="refresh" type="button">Refresh</button>
+    </div>
+  </header>
+  <div class="status"><span id="status">Loading Polymarket…</span> <span id="liveTicker" class="live" hidden></span></div>
+
+  <section class="panel">
+    <div class="panel-head"><h2>Seats per party</h2><span class="status" id="deltaNote">Small number: change over the last 24 hours</span></div>
+    <div class="pollwrap"><div class="poll" id="poll"></div></div>
+    <p class="status" id="pollNote"></p>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head"><h2>Seat map</h2><span class="status">Click a seat to add its party to the coalition below</span></div>
+    <div class="hemiwrap"><svg class="hemi" id="hemi" viewBox="-1.08 -1.06 2.16 1.12" role="img" aria-label="Hemicycle of 120 seats"></svg></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>Build a coalition</h2>
+      <div class="controls" id="presets"></div>
+    </div>
+    <div class="coalition">
+      <div class="chips" id="chips" role="group" aria-label="Parties: tap to add or remove"></div>
+      <div class="tally">
+        <div class="count"><b id="coalSeats">0</b><span>/ 61</span></div>
+        <div class="meter"><i id="coalMeter"></i><span class="mark"></span></div>
+        <div id="coalVerdict" class="verdict"></div>
+        <div class="bigchance" id="coalChanceBox" hidden>
+          <b id="coalChance"></b>
+          <span>chance these parties reach 61+ seats, from 4,000 simulated results</span>
+        </div>
+        <ul class="threshold-risks" id="coalThresholdRisks" hidden></ul>
+        <div class="chance-trend" id="coalTrendWrap" hidden>
+          <div class="status" id="coalTrendTitle"></div>
+          <div class="chance-trend-chart"><canvas id="coalTrend" aria-label="Chance of 61+ seats over time"></canvas></div>
+        </div>
+        <div id="coalList" class="status"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel blocs" id="blocs"><h2>Blocs</h2></section>
+
+  <section class="panel">
+    <h2>Market signals</h2>
+    <div class="signals" id="signals"></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2 id="trendTitle">Trend</h2>
+      <div class="controls">
+        <div class="controls" id="trendWindows" role="group" aria-label="Time window"></div>
+        <button type="button" id="trendParties" aria-pressed="true">Parties</button>
+        <button type="button" id="trendBlocs" aria-pressed="false">Blocs</button>
+      </div>
+    </div>
+    <div id="trendStatus" class="status">Loading price history…</div>
+    <div class="chartbox"><canvas id="trend" aria-label="Seats over the last 7 days"></canvas></div>
+  </section>
+
+  <section class="panel">
+    <h2>Parties</h2>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Party</th><th class="num">Seats</th><th class="num" id="deltaHeader">Change</th><th class="num">Seat ranges</th><th class="num">Vote share</th><th class="num">Kalshi</th><th class="num">P(pass)</th><th>Top bracket</th><th class="num">Volume</th><th>Depth</th><th>Bloc</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table></div>
+    <p class="status">Seat ranges, Vote share and Kalshi are each source's own estimate before scaling to 120. A dash means that source has no market for the party.</p>
+  </section>
+
+  <section class="panel">
+    <h2>Other markets</h2>
+    <div class="cards" id="cards"></div>
+    <div id="cardsStatus" class="status"></div>
+  </section>
+
+  <section class="panel">
+    <details>
+      <summary>How the numbers are calculated</summary>
+      <div class="notes">
+        <p><b>Prices.</b> Each Polymarket seat bracket uses its displayed YES price (<code>outcomePrices</code>), falling back to the last trade. Kalshi uses the bid/ask midpoint, falling back to the last trade.</p>
+        <p><b>Seat ranges.</b> A party's bracket prices are divided by their sum so they add to 100%. Each bracket counts at its midpoint (20–24 counts as 22). An open tail such as "&lt;20" or "30+" counts as one more bracket of the neighbouring width. "Under 4" and anything below the threshold counts as 0 seats.</p>
+        <p><b>Vote share.</b> Where Polymarket has a vote-share market for a party, each share bracket becomes seats as share ÷ (100% − expected wasted vote) × 120, and a bracket under the 3.25% threshold counts as 0 seats. The wasted vote comes from Polymarket's below-threshold market when there is one, otherwise 5%.</p>
+        <p><b>P(pass).</b> The chance a list crosses the threshold: Polymarket's "Which parties will win a seat" market where it lists the party, otherwise the seat-range brackets at 4+ seats, otherwise the vote-share brackets at 3.25%+. Hover a value in the table to see which one was used.</p>
+        <p><b>Kalshi.</b> Kalshi's seat-count markets ask "more than N seats?". The gaps between thresholds become brackets, and the same expected-seats sum is applied. Kalshi refuses requests made from a browser page, so its numbers only appear when the page runs from <code>knesset-poll-server.py</code> or through a CORS proxy.</p>
+        <p><b>Models.</b> <i>Expected seats</i>: each party's seat-range expectation, scaled together to 120 and rounded by largest remainder; a party near the threshold can show 1–3 seats, which no real Knesset allows. <i>Likely Knesset</i>: parties under a 50% chance of passing the threshold get 0, the rest get their expected seats assuming they pass. <i>Blend</i>: seat-range and vote-share estimates averaged by each market's liquidity, then scaled.</p>
+        <p><b>Coalition chance.</b> Each simulated result draws every party's seats from its own brackets and rescales the total to 120. So when a small party passes the threshold, its seats come out of every other party in proportion to its size, and when it misses, its votes are wasted and everyone else grows. The markets don't say whose voters a party takes, so this assumes evenly from everyone.</p>
+        <p><b>Simulation.</b> 4,000 Knessets are drawn, each party's seats from its own bracket prices independently, then scaled to 120. Parties are not independent in reality (votes moving between two lists), so treat the bloc chances as rough.</p>
+        <p><b>Live.</b> Prices reload every minute. The trend uses Polymarket's price history for every bracket over the chosen window (6 hours to 7 days), reloaded every 5 minutes; its last point is always the live price, and the small change numbers compare it with the start of the window.</p>
+        <p><b>Volume</b> is lifetime USD traded and does not weight the seats. Depth: high ≥ $250K, medium ≥ $25K, low below that. These are betting prices, not an opinion poll.</p>
+        <p><label for="proxy">If your browser blocks the requests, put a CORS proxy prefix here (saved in this browser):</label><br><input id="proxy" type="text" placeholder="e.g. https://your-proxy.example/?url="></p>
+      </div>
+    </details>
+    <details id="skippedBox" hidden>
+      <summary>Markets found but not used</summary>
+      <ul class="skipped" id="skipped"></ul>
+    </details>
+  </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+<script>
+const GAMMA = "https://gamma-api.polymarket.com";
+const CLOB = "https://clob.polymarket.com";
+const KALSHI = "https://api.elections.kalshi.com/trade-api/v2";
+const MANIFOLD = "https://api.manifold.markets/v0";
+const POLY_TAGS = ["israel-election", "israeli-election", "israel-elections", "knesset", "israel"];
+const POLY_SEARCHES = ["Knesset seats", "Israel election seats", "Israeli legislative election", "Israel election vote share"];
+const KALSHI_CARD_SERIES = ["KXISRAELBLOCMAJ", "KXISRAELBLOCMOST", "KXISRAELKNESSET", "KXISRAEL2ND", "KXISRAEL3RD", "KXISRAELGOVT", "KXISRAELPM"];
+const REFRESH_MS = 60 * 1000;
+const TREND_REFETCH_MS = 5 * 60 * 1000;
+const HOUR_MS = 3600e3;
+const TREND_WINDOWS = [
+  { key: "6h", label: "6h", spanMs: 6 * HOUR_MS, fidelityMinutes: 5, stepMs: 15 * 60e3 },
+  { key: "24h", label: "24h", spanMs: 24 * HOUR_MS, fidelityMinutes: 10, stepMs: 30 * 60e3 },
+  { key: "3d", label: "3 days", spanMs: 72 * HOUR_MS, fidelityMinutes: 30, stepMs: 2 * HOUR_MS },
+  { key: "7d", label: "7 days", spanMs: 168 * HOUR_MS, fidelityMinutes: 60, stepMs: 4 * HOUR_MS },
+];
+const THRESHOLD_SEATS = 4;
+const THRESHOLD_PCT = 3.25;
+const DEFAULT_WASTED_PCT = 5;
+const SIMULATION_DRAWS = 4000;
+const ELECTION_DAY = "2026-10-27";
+
+// Blocs follow the markets' own definitions (Kalshi's bloc-majority series), so the bloc totals compare with those prices.
+const PARTIES = [
+  { key: "likud", hue: 214, name: "Likud", bloc: "coal", re: /likud/i, kalshi: ["KXLIKUDCOUNT"] },
+  { key: "shas", hue: 268, name: "Shas", bloc: "coal", re: /\bshas\b/i, kalshi: ["KXSHASCOUNT"] },
+  { key: "utj", hue: 296, name: "United Torah Judaism", bloc: "coal", re: /torah|\butj\b|agudat|degel/i, kalshi: [] },
+  { key: "otzma", hue: 30, name: "Otzma Yehudit", bloc: "coal", re: /otzma|ben.?gvir|jewish power/i, kalshi: [] },
+  { key: "rz", hue: 188, name: "Religious Zionism", bloc: "coal", re: /religious zion|\brzp\b|smotrich|zehut/i, kalshi: [] },
+  { key: "noam", hue: 318, name: "Noam", bloc: "coal", re: /\bnoam\b/i, kalshi: [] },
+  { key: "amcha", hue: 244, name: "Amcha Yisrael", bloc: "coal", re: /amcha|people of israel/i, kalshi: [] },
+  { key: "yashar", hue: 168, name: "Yashar", bloc: "opp", re: /yashar|eisenkot/i, kalshi: ["KXYASHARCOUNT"] },
+  { key: "together", hue: 128, name: "Together", bloc: "opp", re: /together|beyachad|bennett/i, kalshi: ["KXTOGETHERCOUNT"] },
+  { key: "democrats", hue: 2, name: "The Democrats", bloc: "opp", re: /democrat|\bdems\b|golan/i, kalshi: ["KXISRDEMCOUNT"] },
+  { key: "yb", hue: 52, name: "Yisrael Beiteinu", bloc: "opp", re: /beit[ae]?[iy]?n[uo]|beyt[ae]?n[uo]|liberman|lieberman/i, kalshi: ["KXBEITEINUCOUNT"] },
+  { key: "yeshatid", hue: 200, name: "Yesh Atid", bloc: "opp", re: /yesh atid|lapid/i, kalshi: [] },
+  { key: "bluewhite", hue: 226, name: "Blue and White", bloc: "opp", re: /blue.{0,5}white|gantz|national unity/i, kalshi: [] },
+  { key: "reservists", hue: 80, name: "Reservists", bloc: "other", re: /reservist/i, kalshi: [] },
+  { key: "joint", hue: 342, name: "Joint List", bloc: "arab", re: /joint list|hadash|ta.?al|balad/i, kalshi: [] },
+  { key: "raam", hue: 104, name: "Ra'am", bloc: "arab", re: /ra.?am\b|united arab/i, kalshi: ["KXRAAMCOUNT"] },
+];
+const BLOCS = [
+  { key: "coal", name: "Netanyahu bloc", hue: 222, sat: 70 },
+  { key: "other", name: "Unassigned", hue: 220, sat: 6 },
+  { key: "arab", name: "Arab parties", hue: 32, sat: 62 },
+  { key: "opp", name: "Opposition", hue: 162, sat: 58 },
+];
+
+let lastData = null;
+let trendData = null;
+let trendView = "parties";
+let chart = null;
+
+const store = {
+  get(key, fallback) { try { const v = localStorage.getItem(key); return v === null ? fallback : JSON.parse(v); } catch { return fallback; } },
+  set(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} },
+};
+
+const workingRouteByHost = new Map();
+const historyByToken = new Map();
+let isRefreshing = false;
+let isLoadingTrend = false;
+
+// Kalshi's CDN rejects browser origins, so a blocked request is retried through the user's proxy and then the bundled local one.
+function routesFor(url) {
+  const userProxy = (store.get("kmp-proxy", "") || "").trim();
+  const routes = [{ name: "direct", url }];
+  if (userProxy) routes.push({ name: "proxy", url: userProxy + encodeURIComponent(url) });
+  if (location.protocol.startsWith("http")) routes.push({ name: "local", url: `${location.origin}/proxy?url=${encodeURIComponent(url)}` });
+  const preferred = workingRouteByHost.get(new URL(url).host);
+  return preferred ? [...routes.filter(r => r.name === preferred), ...routes.filter(r => r.name !== preferred)] : routes;
+}
+
+async function getJson(url) {
+  const host = new URL(url).host;
+  let firstError = null;
+  for (const route of routesFor(url)) {
+    try {
+      const res = await fetch(route.url);
+      if (!res.ok) throw Object.assign(new Error(`${host} answered ${res.status}`), { isHttpError: true });
+      const body = await res.json();
+      workingRouteByHost.set(host, route.name);
+      return body;
+    } catch (error) {
+      firstError ??= error;
+      if (error.isHttpError && route.name === "direct") throw error;
+    }
+  }
+  throw firstError;
+}
+
+async function mapLimit(items, limit, fn) {
+  const out = new Array(items.length);
+  let next = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) { const i = next++; try { out[i] = await fn(items[i]); } catch { out[i] = null; } }
+  });
+  await Promise.all(workers);
+  return out;
+}
+
+const parseJsonList = v => { if (Array.isArray(v)) return v; try { return JSON.parse(v || "[]"); } catch { return []; } };
+const cleanTitle = t => String(t || "").replace(/^.*?election[:\-–]\s*/i, "").trim();
+
+function identify(text) {
+  const known = PARTIES.find(p => p.re.test(text));
+  if (known) return known;
+  const name = text.trim();
+  return { key: "x-" + name.toLowerCase().replace(/[^a-z0-9]+/g, "-"), name, bloc: "other", re: null, kalshi: [] };
+}
+
+function partyFromTitle(title, kind) {
+  const t = cleanTitle(title);
+  const patterns = kind === "share"
+    ? [/^(.*?)\s*vote share/i, /^what will (.*?)['’]s? vote share/i]
+    : [/^(.*?)\s*(#|number)\s*of\s*seats/i, /^how many seats will (.*?) (win|get)/i, /^(.*?)\s+seats\b/i];
+  for (const re of patterns) { const m = t.match(re); if (m && m[1].trim()) return identify(m[1]); }
+  return identify(t);
+}
+
+function blocOf(party) {
+  const overrides = store.get("kmp-blocs", {});
+  return overrides[party.key] || party.bloc;
+}
+
+function kindOf(title) {
+  const t = String(title || "");
+  if (/vote share/i.test(t)) return "share";
+  if (/wasted|below (the )?threshold/i.test(t)) return "wasted";
+  if (/(#|number) of seats|how many seats/i.test(t)) return "seats";
+  if (/which parties will win a seat/i.test(t)) return "passes";
+  return "other";
+}
+
+// Turns a bracket label into numeric bounds; open tails get null on the open side.
+function parseBracket(label) {
+  const s = String(label).replace(/–|—/g, "-").replace(/%/g, "").toLowerCase().trim();
+  if (/not|doesn'?t|fail|below threshold|no seats|^0$/.test(s)) return { lo: 0, hi: 0 };
+  let m = s.match(/(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)/);
+  if (m) return { lo: +m[1], hi: +m[2] };
+  m = s.match(/(?:<|under|less than|fewer than|below)\s*(\d+(?:\.\d+)?)/);
+  if (m) return { lo: null, hi: +m[1], open: "lt" };
+  m = s.match(/(\d+(?:\.\d+)?)\s*(?:or fewer|or less)/);
+  if (m) return { lo: null, hi: +m[1] };
+  m = s.match(/(?:>|over|more than|above)\s*(\d+(?:\.\d+)?)/);
+  if (m) return { lo: +m[1], hi: null, open: "gt" };
+  m = s.match(/(\d+(?:\.\d+)?)\s*(?:\+|or more)/);
+  if (m) return { lo: +m[1], hi: null };
+  m = s.match(/^(\d+(?:\.\d+)?)$/) || s.match(/\b(\d+)\s*seats?\b/);
+  if (m) return { lo: +m[1], hi: +m[1] };
+  return null;
+}
+
+// Seat brackets are whole numbers, so "<20" ends at 19; share brackets are continuous.
+function bracketValues(brackets, { integer }) {
+  const step = integer ? 1 : 0;
+  const norm = brackets.map(b => ({
+    ...b,
+    lo: b.open === "gt" ? b.lo + step : b.lo,
+    hi: b.open === "lt" ? b.hi - step : b.hi,
+  }));
+  const closed = norm.filter(b => b.lo !== null && b.hi !== null && b.hi > 0);
+  const width = closed.length ? closed.reduce((a, b) => a + (b.hi - b.lo + step), 0) / closed.length : 5;
+  return norm.map(b => {
+    if (b.lo !== null && b.hi !== null) return { ...b, value: (b.lo + b.hi) / 2 };
+    if (b.lo === null) {
+      if (integer && b.hi < THRESHOLD_SEATS) return { ...b, value: 0 };
+      return { ...b, value: Math.max(integer ? THRESHOLD_SEATS : 0, b.hi - (width - step) / 2) };
+    }
+    return { ...b, value: b.lo + (width - step) / 2 };
+  });
+}
+
+function summarise(brackets, { integer }) {
+  const valued = bracketValues(brackets, { integer });
+  const priceSum = valued.reduce((a, b) => a + b.price, 0);
+  if (priceSum <= 0) return null;
+  for (const b of valued) b.p = b.price / priceSum;
+  const expected = valued.reduce((a, b) => a + b.p * b.value, 0);
+  const passAt = integer ? THRESHOLD_SEATS : THRESHOLD_PCT;
+  const passing = valued.filter(b => b.value >= passAt);
+  const pPass = passing.reduce((a, b) => a + b.p, 0);
+  const expectedIfPass = pPass > 0 ? passing.reduce((a, b) => a + b.p * b.value, 0) / pPass : 0;
+  const top = valued.reduce((a, b) => (b.p > a.p ? b : a));
+  return { brackets: valued, priceSum, expected, pPass, expectedIfPass, top };
+}
+
+const seatsForShare = ({ sharePct, wastedPct }) => (sharePct >= THRESHOLD_PCT ? (sharePct / (100 - wastedPct)) * 120 : 0);
+
+function shareSeatModel({ share, wastedPct }) {
+  const expected = share.brackets.reduce((a, b) => a + b.p * seatsForShare({ sharePct: b.value, wastedPct }), 0);
+  return { expected, pPass: share.pPass, expectedIfPass: share.pPass > 0 ? expected / share.pPass : 0 };
+}
+
+function pickBracket(brackets) {
+  let u = Math.random();
+  for (const b of brackets) { u -= b.p; if (u <= 0) return b; }
+  return brackets[brackets.length - 1];
+}
+
+function polyPrice(market) {
+  const prices = parseJsonList(market.outcomePrices).map(Number);
+  const outcomes = parseJsonList(market.outcomes);
+  const yes = Math.max(0, outcomes.findIndex(o => /^yes$/i.test(o)));
+  if (Number.isFinite(prices[yes])) return prices[yes];
+  const last = Number(market.lastTradePrice);
+  return Number.isFinite(last) ? last : 0;
+}
+
+function polyYesToken(market) {
+  const ids = parseJsonList(market.clobTokenIds);
+  const outcomes = parseJsonList(market.outcomes);
+  return ids[Math.max(0, outcomes.findIndex(o => /^yes$/i.test(o)))] || null;
+}
+
+function polyBrackets(event, skipped) {
+  const out = [];
+  for (const m of event.markets || []) {
+    const label = m.groupItemTitle || m.question || "";
+    const bounds = parseBracket(label);
+    if (!bounds) { skipped.push(`Polymarket · ${event.title} → "${label}"`); continue; }
+    out.push({ ...bounds, label, price: polyPrice(m), token: polyYesToken(m) });
+  }
+  return out;
+}
+
+async function loadPolymarketEvents() {
+  const byId = new Map();
+  const errors = [];
+  const add = e => { if (e && e.id && !byId.has(e.id)) byId.set(e.id, e); };
+  await Promise.all([
+    ...POLY_TAGS.map(tag => getJson(`${GAMMA}/events?tag_slug=${tag}&closed=false&limit=500`).then(list => list.forEach(add), err => errors.push(err.message))),
+    ...POLY_SEARCHES.map(q => getJson(`${GAMMA}/public-search?q=${encodeURIComponent(q)}&events_status=active&limit_per_type=50`).then(r => (r.events || []).forEach(add), () => {})),
+  ]);
+  const events = [...byId.values()].filter(e => !e.closed && !/combo/i.test(e.title || "") && (kindOf(e.title) !== "other" || /election|knesset|prime minister|coalition|bloc|most seats|largest party|israeli government/i.test(e.title || "")));
+  const missingMarkets = events.filter(e => !Array.isArray(e.markets) || !e.markets.length);
+  await mapLimit(missingMarkets, 6, async e => {
+    const full = await getJson(`${GAMMA}/events?slug=${encodeURIComponent(e.slug)}`);
+    if (full[0]) Object.assign(e, full[0]);
+  });
+  if (!events.length && errors.length) throw new Error(errors[0]);
+  return events;
+}
+
+function kalshiPrice(m) {
+  const cents = v => (v === undefined || v === null || v === "" ? NaN : Number(v));
+  const bid = Number.isFinite(cents(m.yes_bid_dollars)) ? cents(m.yes_bid_dollars) : cents(m.yes_bid) / 100;
+  const ask = Number.isFinite(cents(m.yes_ask_dollars)) ? cents(m.yes_ask_dollars) : cents(m.yes_ask) / 100;
+  const last = Number.isFinite(cents(m.last_price_dollars)) ? cents(m.last_price_dollars) : cents(m.last_price) / 100;
+  if (bid > 0 && ask > 0 && ask < 1) return (bid + ask) / 2;
+  return Number.isFinite(last) ? last : 0;
+}
+
+async function kalshiMarkets(series) {
+  const r = await getJson(`${KALSHI}/markets?series_ticker=${series}&status=open&limit=200`);
+  return r.markets || [];
+}
+
+const kalshiVolume = markets => markets.reduce((a, m) => a + (Number(m.volume_fp ?? m.volume) || 0), 0);
+
+// Kalshi seat counts are "more than N" ladders; consecutive thresholds become brackets.
+function kalshiSeatSummary(markets) {
+  const ladder = markets
+    .map(m => ({ n: Number(m.floor_strike ?? (String(m.yes_sub_title || m.subtitle || "").match(/(\d+)/) || [])[1]), p: kalshiPrice(m) }))
+    .filter(x => Number.isFinite(x.n))
+    .sort((a, b) => a.n - b.n);
+  if (!ladder.length) return null;
+  for (let i = 1; i < ladder.length; i++) ladder[i].p = Math.min(ladder[i].p, ladder[i - 1].p);
+  const brackets = [{ lo: null, hi: ladder[0].n, label: `≤${ladder[0].n}`, price: 1 - ladder[0].p }];
+  for (let i = 0; i < ladder.length; i++) {
+    const lo = ladder[i].n + 1;
+    const nextP = ladder[i + 1] ? ladder[i + 1].p : 0;
+    brackets.push(ladder[i + 1]
+      ? { lo, hi: ladder[i + 1].n, label: `${lo}-${ladder[i + 1].n}`, price: ladder[i].p - nextP }
+      : { lo, hi: null, label: `${lo}+`, price: ladder[i].p });
+  }
+  return summarise(brackets, { integer: true });
+}
+
+async function loadKalshi() {
+  const result = { seats: {}, cards: [], found: [] };
+  const seatJobs = PARTIES.flatMap(p => p.kalshi.map(series => ({ p, series })));
+  await mapLimit(seatJobs, 6, async ({ p, series }) => {
+    if (result.seats[p.key]) return;
+    const markets = await kalshiMarkets(series);
+    const s = markets.length && kalshiSeatSummary(markets);
+    if (s) { result.seats[p.key] = { ...s, volume: kalshiVolume(markets) }; result.found.push(series); }
+  });
+  const cards = await mapLimit(KALSHI_CARD_SERIES, 4, async series => {
+    const [markets, info] = await Promise.all([kalshiMarkets(series), getJson(`${KALSHI}/series/${series}`).catch(() => null)]);
+    if (!markets.length) return null;
+    result.found.push(series);
+    return {
+      src: "Kalshi",
+      title: info?.series?.title || series,
+      url: `https://kalshi.com/markets/${series.toLowerCase()}`,
+      outcomes: markets.map(m => ({ label: m.yes_sub_title || m.subtitle || m.ticker, p: kalshiPrice(m) })),
+      volume: kalshiVolume(markets),
+      volumeUnit: "contracts",
+    };
+  });
+  result.cards = cards.filter(Boolean);
+  return result;
+}
+
+async function loadManifold() {
+  const seen = new Map();
+  for (const term of ["Knesset", "Israel election 2026", "Israeli election"]) {
+    try {
+      const list = await getJson(`${MANIFOLD}/search-markets?term=${encodeURIComponent(term)}&filter=open&limit=20`);
+      list.forEach(m => seen.set(m.id, m));
+    } catch {}
+  }
+  const relevant = [...seen.values()]
+    .filter(m => ["BINARY", "MULTIPLE_CHOICE"].includes(m.outcomeType))
+    .filter(m => /knesset|israel/i.test(m.question) && /election|seats?\b|prime minister|bloc|coalition|govt|government/i.test(m.question))
+    .sort((a, b) => (b.volume || 0) - (a.volume || 0))
+    .slice(0, 8);
+  const cards = await mapLimit(relevant, 4, async m => {
+    const full = m.outcomeType === "MULTIPLE_CHOICE" ? await getJson(`${MANIFOLD}/market/${m.id}`) : m;
+    const outcomes = full.outcomeType === "MULTIPLE_CHOICE"
+      ? (full.answers || []).map(a => ({ label: a.text, p: a.probability }))
+      : [{ label: "Yes", p: full.probability }];
+    return { src: "Manifold (play money)", title: full.question, url: full.url, outcomes, volume: full.volume, volumeUnit: "mana" };
+  });
+  return cards.filter(Boolean);
+}
+
+const liveMarkets = event => (event.markets || []).filter(m => !m.closed && m.active !== false);
+
+function polyOutcomes(event) {
+  const markets = liveMarkets(event);
+  if (markets.length === 1) {
+    const labels = parseJsonList(markets[0].outcomes);
+    const prices = parseJsonList(markets[0].outcomePrices).map(Number);
+    const isYesNo = labels.some(label => /^yes$/i.test(label));
+    return isYesNo ? [{ label: "Yes", p: polyPrice(markets[0]) }] : labels.map((label, i) => ({ label, p: prices[i] }));
+  }
+  return markets.map(m => ({ label: m.groupItemTitle || m.question, p: polyPrice(m) }));
+}
+
+function polyCards(events) {
+  return events.filter(e => ["other", "passes"].includes(kindOf(e.title)) && liveMarkets(e).length).map(e => ({
+    src: "Polymarket",
+    title: e.title,
+    url: `https://polymarket.com/event/${e.slug}`,
+    outcomes: polyOutcomes(e),
+    volume: Number(e.volume) || 0,
+    volumeUnit: "usd",
+  }));
+}
+
+function polyEventPrice({ events, slugPattern, outcome }) {
+  const event = events.find(e => slugPattern.test(e.slug || ""));
+  if (!event) return null;
+  const match = polyOutcomes(event).find(o => outcome.test(o.label));
+  return match && Number.isFinite(match.p) ? { p: match.p, url: `https://polymarket.com/event/${event.slug}` } : null;
+}
+
+async function refresh() {
+  if (isRefreshing) return;
+  isRefreshing = true;
+  const status = document.getElementById("status");
+  status.className = "status";
+  status.textContent = "Loading Polymarket…";
+  try {
+    const events = await loadPolymarketEvents();
+    const skipped = [];
+    const parties = new Map();
+    const entry = party => parties.get(party.key) || (parties.set(party.key, { party }), parties.get(party.key));
+    const directPass = {};
+    const logoByKey = {};
+    const partyLogo = item => [item.icon, item.image].find(url => url && !/flag/i.test(url));
+    let wastedPct = DEFAULT_WASTED_PCT;
+    for (const e of events) {
+      if (/win a seat|next israeli government/i.test(e.title || "")) {
+        for (const m of liveMarkets(e)) logoByKey[identify(m.groupItemTitle || "").key] ??= partyLogo(m);
+      }
+    }
+    for (const e of events) {
+      const kind = kindOf(e.title);
+      if (kind === "seats") {
+        const s = summarise(polyBrackets(e, skipped), { integer: true });
+        if (!s) continue;
+        const party = partyFromTitle(e.title, "seats");
+        if (partyLogo(e)) logoByKey[party.key] = partyLogo(e);
+        Object.assign(entry(party), { seats: s, slug: e.slug, volume: Number(e.volume) || 0, liquidity: Number(e.liquidity) || 0 });
+      } else if (kind === "share") {
+        const s = summarise(polyBrackets(e, skipped), { integer: false });
+        if (s) Object.assign(entry(partyFromTitle(e.title, "share")), { share: s, shareLiquidity: Number(e.liquidity) || 0, shareVolume: Number(e.volume) || 0, shareSlug: e.slug });
+      } else if (kind === "wasted") {
+        const s = summarise(polyBrackets(e, skipped), { integer: false });
+        if (s) wastedPct = s.expected;
+      } else if (kind === "passes") {
+        for (const m of liveMarkets(e)) directPass[identify(m.groupItemTitle || m.question || "").key] = polyPrice(m);
+      }
+    }
+    for (const v of parties.values()) {
+      if (v.share) { v.shareModel = shareSeatModel({ share: v.share, wastedPct }); v.shareSeats = v.shareModel.expected; }
+      if (directPass[v.party.key] !== undefined) v.directPass = directPass[v.party.key];
+      v.logo = logoByKey[v.party.key] || null;
+    }
+    const list = [...parties.values()].filter(v => v.seats || v.share);
+    if (!list.length) throw new Error("no per-party seat or vote-share markets found");
+    lastData = { parties: list, events, skipped, wastedPct, at: new Date(), kalshi: lastData?.kalshi || null, extraCards: lastData?.extraCards || [] };
+    if (trendData?.series) computeTrend();
+    render();
+    status.textContent = `${list.length} parties · expected wasted vote ${wastedPct.toFixed(1)}% ·`;
+    loadSideSources();
+    if (!isLoadingTrend && (!trendData || Date.now() - trendData.at > TREND_REFETCH_MS)) loadTrend();
+  } catch (err) {
+    status.className = "status err";
+    const hint = err instanceof TypeError ? " Your browser blocked the request (CORS or offline). Run it with knesset-poll-server.py, or add a CORS proxy under “How the numbers are calculated”." : "";
+    status.textContent = `Couldn't load Polymarket: ${err.message}.${hint}`;
+  } finally {
+    isRefreshing = false;
+  }
+}
+
+async function loadSideSources() {
+  const cardsStatus = document.getElementById("cardsStatus");
+  cardsStatus.textContent = "Loading Kalshi and Manifold…";
+  const [kalshi, manifold] = await Promise.all([loadKalshi().catch(() => null), loadManifold().catch(() => [])]);
+  lastData.kalshi = kalshi;
+  lastData.extraCards = [...(kalshi?.cards || []), ...manifold];
+  const notes = [];
+  notes.push(kalshi && kalshi.found.length ? `Kalshi: ${kalshi.found.length} series found` : "Kalshi: nothing loaded (blocked or no matching series)");
+  notes.push(manifold.length ? `Manifold: ${manifold.length} markets` : "Manifold: nothing loaded");
+  cardsStatus.textContent = notes.join(" · ");
+  render();
+}
+
+// One input row per party for the model, so the live view and the trend share the same maths.
+function passChance(v) {
+  if (v.directPass !== undefined) return { pPass: v.directPass, passSource: "Polymarket “wins a seat” market" };
+  if (v.seats) return { pPass: v.seats.pPass, passSource: "seat ranges (4+ seats)" };
+  return { pPass: v.shareModel?.pPass ?? 0, passSource: `vote share (${THRESHOLD_PCT}%+)` };
+}
+
+function modelInputs(v, mode) {
+  const { pPass, passSource } = passChance(v);
+  const seats = v.seats;
+  const share = v.shareModel;
+  if (mode === "blend" && seats && share) {
+    const w1 = Math.max(v.liquidity || 0, 1), w2 = Math.max(v.shareLiquidity || 0, 1);
+    return { base: (seats.expected * w1 + share.expected * w2) / (w1 + w2), pPass, passSource };
+  }
+  if (mode === "feasible") {
+    const seatsIfPass = seats ? seats.expectedIfPass : Math.max(share?.expectedIfPass ?? 0, THRESHOLD_SEATS);
+    return { base: pPass >= 0.5 ? seatsIfPass : 0, pPass, passSource };
+  }
+  return { base: seats ? seats.expected : (share?.expected ?? 0), pPass, passSource };
+}
+
+function largestRemainder(values, total) {
+  const sum = values.reduce((a, b) => a + b, 0);
+  if (sum <= 0) return values.map(() => 0);
+  const exact = values.map(v => (v / sum) * total);
+  const floors = exact.map(Math.floor);
+  const left = total - floors.reduce((a, b) => a + b, 0);
+  const order = exact.map((v, i) => [v - floors[i], i]).sort((a, b) => b[0] - a[0]);
+  for (let k = 0; k < left; k++) floors[order[k][1]]++;
+  return floors;
+}
+
+function scaleTo120(bases) {
+  const sum = bases.reduce((a, b) => a + b, 0);
+  return sum > 0 ? bases.map(b => (b / sum) * 120) : bases.map(() => 0);
+}
+
+const money = v => v >= 1e6 ? `$${(v / 1e6).toFixed(2)}M` : v >= 1e3 ? `$${(v / 1e3).toFixed(1)}K` : `$${Math.round(v)}`;
+const pct = v => `${Math.round(v * 100)}%`;
+const depth = v => v >= 250e3 ? ["high", "High"] : v >= 25e3 ? ["med", "Medium"] : ["low", "Low"];
+const isDark = () => matchMedia("(prefers-color-scheme: dark)").matches;
+const cssVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+function colorFor(parties) {
+  const counts = {};
+  const colors = {};
+  for (const v of parties) {
+    const bloc = BLOCS.find(b => b.key === blocOf(v.party));
+    const i = counts[bloc.key] = (counts[bloc.key] ?? -1) + 1;
+    const light = (isDark() ? 66 : 46) + (i % 2 ? 1 : -1) * Math.ceil(i / 2) * 7;
+    colors[v.party.key] = v.party.hue !== undefined
+      ? `hsl(${v.party.hue} 62% ${isDark() ? 64 : 46}%)`
+      : `hsl(${bloc.hue + i * 6} ${bloc.sat}% ${Math.min(80, Math.max(26, light))}%)`;
+  }
+  return colors;
+}
+
+function currentView() {
+  const mode = document.getElementById("mode").value;
+  const inputs = lastData.parties.map(v => ({ v, ...modelInputs(v, mode) }));
+  const seats = largestRemainder(inputs.map(x => x.base), 120);
+  const rows = inputs.map((x, i) => ({ ...x, seats: seats[i] })).sort((a, b) => b.seats - a.seats || b.base - a.base);
+  return { mode, rows, colors: colorFor(rows.map(r => r.v)) };
+}
+
+function deltaFor(key) {
+  if (!trendData || trendData.mode !== document.getElementById("mode").value) return null;
+  const s = trendData.series[key];
+  if (!s || s.length < 2) return null;
+  const now = s[s.length - 1].y;
+  return now - s[0].y;
+}
+
+function deltaText(d) {
+  if (d === null || Math.abs(d) < 0.05) return ["", ""];
+  return [d > 0 ? "up" : "down", `${d > 0 ? "▲" : "▼"}${Math.abs(d).toFixed(1)}`];
+}
+
+function render() {
+  if (!lastData) return;
+  const { rows, colors } = currentView();
+  renderPoll(rows, colors);
+  renderBlocs(rows);
+  drawHemicycle(rows, colors);
+  renderTable(rows, colors);
+  renderCards();
+  renderCoalition(rows, colors);
+  renderTrend();
+  const skippedBox = document.getElementById("skippedBox");
+  skippedBox.hidden = !lastData.skipped.length;
+  document.getElementById("skipped").replaceChildren(...lastData.skipped.map(s => { const li = document.createElement("li"); li.textContent = s; return li; }));
+}
+
+function logoFor(v, size) {
+  const img = document.createElement("img");
+  img.className = `logo${size === "small" ? " sm" : ""}`;
+  img.alt = "";
+  img.loading = "lazy";
+  if (v.logo) img.src = v.logo; else img.classList.add("blank");
+  img.addEventListener("error", () => { img.removeAttribute("src"); img.classList.add("blank"); }, { once: true });
+  return img;
+}
+
+function renderPoll(rows, colors) {
+  const max = Math.max(...rows.map(r => r.seats), 1);
+  const BAR_MAX_PX = 180;
+  const picked = pickedParties();
+  const poll = document.getElementById("poll");
+  poll.classList.toggle("has-picked", picked.size > 0);
+  poll.replaceChildren(...rows.filter(r => r.seats > 0 || r.pPass >= 0.2).map(r => {
+    const div = document.createElement("div");
+    div.className = "pbar";
+    div.classList.toggle("picked", picked.has(r.v.party.key));
+    if (r.seats > 0) div.addEventListener("click", () => togglePicked(r.v.party.key));
+    const [cls, txt] = deltaText(deltaFor(r.v.party.key));
+    div.innerHTML = `<div class="col"><div class="n"></div><div class="d"></div><i></i></div><div class="label"><div class="name"></div></div>`;
+    div.querySelector(".n").textContent = r.seats > 0 ? r.seats : "—";
+    const d = div.querySelector(".d"); d.textContent = txt; if (cls) d.classList.add(cls);
+    const bar = div.querySelector("i");
+    bar.style.height = `${Math.max(3, (r.seats / max) * BAR_MAX_PX)}px`;
+    bar.style.background = colors[r.v.party.key];
+    div.querySelector(".label").prepend(logoFor(r.v));
+    div.querySelector(".name").textContent = r.v.party.name;
+    div.title = r.seats > 0 ? `${r.v.party.name}: ${r.seats} seats, ${pct(r.pPass)} chance to pass the threshold` : `${r.v.party.name}: below threshold (${pct(r.pPass)} chance to pass)`;
+    return div;
+  }));
+  document.getElementById("pollNote").textContent = pollNote(rows);
+}
+
+function pollNote(rows) {
+  const mode = document.getElementById("mode").value;
+  const impossible = rows.filter(r => r.seats > 0 && r.seats < THRESHOLD_SEATS);
+  const onTheLine = rows.filter(r => r.pPass >= 0.2 && r.pPass <= 0.8);
+  const rawTotal = rows.reduce((a, r) => a + r.base, 0);
+  const notes = [];
+  if (mode === "expected" && impossible.length) {
+    notes.push(`${impossible.map(r => `${r.v.party.name} (${r.seats})`).join(", ")} can't really win under ${THRESHOLD_SEATS} seats: Expected seats averages its chance of passing the ${THRESHOLD_PCT}% threshold with its chance of getting none. “Likely Knesset” shows a result that could actually happen.`);
+  }
+  if (onTheLine.length) notes.push(`On the threshold line: ${onTheLine.map(r => `${r.v.party.name} ${pct(r.pPass)}`).join(", ")}. Each of these swings about 4 seats between the blocs.`);
+  if (rawTotal > 0) notes.push(`Before scaling, the markets add up to ${rawTotal.toFixed(0)} seats, so each party is scaled by ${(120 / rawTotal).toFixed(2)}.`);
+  return notes.join(" ");
+}
+
+function renderBlocs(rows) {
+  const blocs = document.getElementById("blocs");
+  const totals = BLOCS.map(b => ({ ...b, members: rows.filter(r => blocOf(r.v.party) === b.key && r.seats > 0) }))
+    .map(b => ({ ...b, seats: b.members.reduce((a, r) => a + r.seats, 0) }))
+    .filter(b => b.seats > 0 || b.key !== "other");
+  blocs.replaceChildren(blocs.querySelector("h2"), ...totals.map(b => {
+    const div = document.createElement("div");
+    div.className = "bloc";
+    div.innerHTML = `<span class="sw" style="background:hsl(${b.hue} ${b.sat}% ${isDark() ? 66 : 46}%)"></span><span></span><b>${b.seats}</b><small></small>`;
+    div.children[1].textContent = b.name;
+    div.querySelector("small").textContent = b.members.map(r => `${r.v.party.name} ${r.seats}`).join(" · ") + (b.key === "other" ? " — pick a bloc for these in the table" : "");
+    return div;
+  }));
+  const coal = totals.find(b => b.key === "coal")?.seats ?? 0;
+  const opp = totals.find(b => b.key === "opp")?.seats ?? 0;
+  const raamSeats = rows.find(r => r.v.party.key === "raam" && blocOf(r.v.party) !== "opp")?.seats ?? 0;
+  const oppWithRaam = opp + raamSeats;
+  const note = document.createElement("div");
+  note.className = "majority";
+  note.textContent = coal >= 61 ? `Netanyahu bloc reaches 61 (${coal}).`
+    : opp >= 61 ? `Opposition reaches 61 without the Arab parties (${opp}).`
+    : `Netanyahu bloc is ${61 - coal} short of 61. Opposition is ${61 - opp} short on its own; ${oppWithRaam >= 61 ? `with Ra'am it has ${oppWithRaam}` : `with Ra'am it is still ${61 - oppWithRaam} short`}.`;
+  blocs.append(note, blocOddsNote());
+}
+
+function blocOddsNote() {
+  const keysIn = blocKeys => new Set(lastData.parties.filter(v => blocKeys.includes(blocOf(v.party))).map(v => v.party.key));
+  const coal = keysIn(["coal"]), opp = keysIn(["opp"]), oppRaam = new Set([...keysIn(["opp"]), "raam"]);
+  const simulated = {
+    coal61: shareOfDraws(({ draw, seatsOf }) => seatsOf(draw, coal) >= 60.5),
+    opp61: shareOfDraws(({ draw, seatsOf }) => seatsOf(draw, opp) >= 60.5),
+    oppRaam61: shareOfDraws(({ draw, seatsOf }) => seatsOf(draw, oppRaam) >= 60.5),
+    coalLeads: shareOfDraws(({ draw, seatsOf }) => seatsOf(draw, coal) > seatsOf(draw, opp)),
+  };
+  const marketCoalLeads = polyEventPrice({ events: lastData.events, slugPattern: /which-bloc-wins-more-seats/, outcome: /bibi|netanyahu/i });
+  const marketHung = polyEventPrice({ events: lastData.events, slugPattern: /hung-parliament/, outcome: /^yes$/i });
+  const div = document.createElement("div");
+  div.className = "majority";
+  const lines = [
+    `Simulated from the seat ranges: Netanyahu bloc reaches 61 in ${pct(simulated.coal61)} of runs, the Opposition alone in ${pct(simulated.opp61)}, the Opposition with Ra'am in ${pct(simulated.oppRaam61)}.`,
+    `Netanyahu bloc wins more seats than the Opposition: ${pct(simulated.coalLeads)} simulated${marketCoalLeads ? `, ${pct(marketCoalLeads.p)} on Polymarket's own market` : ""}.`,
+  ];
+  if (marketHung) lines.push(`Polymarket prices a hung parliament at ${pct(marketHung.p)}.`);
+  const kalshiMajority = (lastData.extraCards || []).find(c => /kxisraelblocmaj/.test(c.url));
+  const kalshiOdds = label => kalshiMajority?.outcomes.find(o => label.test(o.label))?.p;
+  if (kalshiMajority) lines.push(`Kalshi's bloc-majority market: Netanyahu bloc ${pct(kalshiOdds(/netanyahu/i) ?? 0)}, Opposition ${pct(kalshiOdds(/opposition/i) ?? 0)}, neither ${pct(kalshiOdds(/none/i) ?? 0)}. A big gap from the simulation means the bloc markets and the per-party markets disagree.`);
+  div.textContent = lines.join(" ");
+  return div;
+}
+
+function renderTable(rows, colors) {
+  const kalshi = lastData.kalshi;
+  document.getElementById("rows").replaceChildren(...rows.map(r => {
+    const v = r.v;
+    const tr = document.createElement("tr");
+    const vol = (v.volume || 0) + (v.shareVolume || 0);
+    const [cls, label] = depth(vol);
+    const [dcls, dtxt] = deltaText(deltaFor(v.party.key));
+    const ks = kalshi?.seats?.[v.party.key];
+    tr.innerHTML = `
+      <td><div class="party"><span class="sw"></span><a target="_blank" rel="noopener"></a></div></td>
+      <td class="seats">${r.seats}</td>
+      <td class="num ${dcls}">${dtxt || "·"}</td>
+      <td class="num">${v.seats ? v.seats.expected.toFixed(1) : "—"}</td>
+      <td class="num">${v.shareSeats !== undefined ? v.shareSeats.toFixed(1) : "—"}</td>
+      <td class="num">${ks ? ks.expected.toFixed(1) : "—"}</td>
+      <td class="num" title="From ${r.passSource}">${pct(r.pPass)}</td>
+      <td></td>
+      <td class="num">${vol ? money(vol) : "—"}</td>
+      <td>${vol ? `<span class="pill ${cls}">${label}</span>` : ""}</td>
+      <td><select aria-label="Bloc"></select></td>`;
+    tr.querySelector(".sw").style.background = colors[v.party.key];
+    tr.querySelector(".sw").after(logoFor(v, "small"));
+    const a = tr.querySelector("a");
+    a.textContent = v.party.name;
+    a.href = `https://polymarket.com/event/${v.slug || v.shareSlug}`;
+    tr.children[7].textContent = v.seats ? `${v.seats.top.label} (${pct(v.seats.top.p)})` : "—";
+    const sel = tr.querySelector("select");
+    sel.id = `bloc-${v.party.key}`;
+    for (const b of BLOCS) sel.add(new Option(b.name, b.key, false, b.key === blocOf(v.party)));
+    sel.addEventListener("change", () => {
+      const overrides = store.get("kmp-blocs", {});
+      overrides[v.party.key] = sel.value;
+      store.set("kmp-blocs", overrides);
+      render();
+    });
+    return tr;
+  }));
+}
+
+function renderCards() {
+  const cards = [...polyCards(lastData.events), ...(lastData.extraCards || [])];
+  document.getElementById("cards").replaceChildren(...cards.map(c => {
+    const div = document.createElement("div");
+    div.className = "card";
+    div.innerHTML = `<div class="src"></div><h3><a target="_blank" rel="noopener"></a></h3><ol></ol><div class="meta"></div>`;
+    div.querySelector(".src").textContent = c.src;
+    const a = div.querySelector("a"); a.textContent = c.title; a.href = c.url;
+    const top = [...c.outcomes].filter(o => Number.isFinite(o.p)).sort((x, y) => y.p - x.p).slice(0, 5);
+    div.querySelector("ol").replaceChildren(...top.map(o => {
+      const li = document.createElement("li");
+      li.innerHTML = "<span></span><span></span>";
+      li.children[0].textContent = o.label;
+      li.children[1].textContent = pct(o.p);
+      return li;
+    }));
+    div.querySelector(".meta").textContent = c.volume ? (c.volumeUnit === "usd" ? `Volume ${money(c.volume)}` : `Volume ${Math.round(c.volume).toLocaleString()} ${c.volumeUnit}`) : "";
+    return div;
+  }));
+}
+
+function renderSignals() {
+  const events = lastData.events;
+  const signals = [];
+  const pmEvent = events.find(e => /prime-minister-of-israel-after-the-next-election/.test(e.slug || ""));
+  if (pmEvent) {
+    for (const o of polyOutcomes(pmEvent).filter(o => Number.isFinite(o.p)).sort((a, b) => b.p - a.p).slice(0, 3)) {
+      signals.push({ value: pct(o.p), label: `${o.label} is the next prime minister (Polymarket)` });
+    }
+  }
+  const hung = polyEventPrice({ events, slugPattern: /hung-parliament/, outcome: /^yes$/i });
+  if (hung) signals.push({ value: pct(hung.p), label: "Hung parliament (Polymarket)" });
+  const anyMajority = polyEventPrice({ events, slugPattern: /any-coalition-wins-a-majority/, outcome: /^yes$/i });
+  if (anyMajority) signals.push({ value: pct(anyMajority.p), label: "“Any coalition wins a majority” (Polymarket)" });
+  const repeatEvent = events.find(e => /elections-before-government-formed/.test(e.slug || ""));
+  if (repeatEvent) {
+    const outcomes = polyOutcomes(repeatEvent).filter(o => Number.isFinite(o.p));
+    const total = outcomes.reduce((a, o) => a + o.p, 0);
+    const repeat = outcomes.filter(o => Number(o.label) >= 2).reduce((a, o) => a + o.p, 0);
+    if (total > 0) signals.push({ value: pct(repeat / total), label: "At least one more election before a government forms (Polymarket)" });
+  }
+  document.getElementById("signals").replaceChildren(...signals.map(s => {
+    const div = document.createElement("div");
+    div.className = "signal";
+    div.innerHTML = "<b></b><span></span>";
+    div.firstChild.textContent = s.value;
+    div.lastChild.textContent = s.label;
+    return div;
+  }));
+}
+
+const PRESETS = [
+  { label: "Netanyahu bloc", pick: rows => rows.filter(r => blocOf(r.v.party) === "coal") },
+  { label: "Opposition", pick: rows => rows.filter(r => blocOf(r.v.party) === "opp") },
+  { label: "Opposition + Ra'am", pick: rows => rows.filter(r => blocOf(r.v.party) === "opp" || r.v.party.key === "raam") },
+  { label: "Clear", pick: () => [] },
+];
+
+const pickedParties = () => new Set(store.get("kmp-coalition", []));
+
+function togglePicked(key) {
+  const picked = pickedParties();
+  picked.has(key) ? picked.delete(key) : picked.add(key);
+  store.set("kmp-coalition", [...picked]);
+  render();
+}
+
+function renderCoalition(rows, colors) {
+  const picked = pickedParties();
+  const inKnesset = rows.filter(r => r.seats > 0);
+  const save = keys => { store.set("kmp-coalition", [...keys]); render(); };
+
+  document.getElementById("presets").replaceChildren(...PRESETS.map(p => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = p.label;
+    b.addEventListener("click", () => save(p.pick(inKnesset).map(r => r.v.party.key)));
+    return b;
+  }));
+
+  document.getElementById("chips").replaceChildren(...rows.map(r => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = r.seats > 0 ? "chip" : "chip below-threshold";
+    b.id = `chip-${r.v.party.key}`;
+    if (r.seats === 0) b.title = `${r.v.party.name} is under 50% to pass the threshold (${pct(r.pPass)}), so it counts as 0 seats here`;
+    b.setAttribute("aria-pressed", String(picked.has(r.v.party.key)));
+    b.innerHTML = `<span class="sw"></span><span></span><b>${r.seats}</b>`;
+    b.querySelector(".sw").style.background = colors[r.v.party.key];
+    b.children[1].textContent = r.v.party.name;
+    b.querySelector(".sw").after(logoFor(r.v, "small"));
+    b.addEventListener("click", () => {
+      togglePicked(r.v.party.key);
+      document.getElementById(b.id)?.focus();
+    });
+    return b;
+  }));
+
+  const members = rows.filter(r => picked.has(r.v.party.key));
+  const total = members.reduce((a, r) => a + r.seats, 0);
+  document.getElementById("coalSeats").textContent = total;
+  document.getElementById("coalMeter").style.width = `${(total / 120) * 100}%`;
+  const verdict = document.getElementById("coalVerdict");
+  verdict.className = "verdict " + (total >= 61 ? "good" : members.length ? "bad" : "");
+  verdict.textContent = !members.length ? "Tap parties to build a coalition."
+    : total === 61 ? "Bare majority, nothing to spare."
+    : total > 61 ? `Majority, with ${total - 61} to spare.` : `${61 - total} short of a majority.`;
+  document.getElementById("coalList").textContent = members.map(r => r.v.party.name).join(" + ");
+  const chance = members.length ? coalitionChance(members.map(r => r.v.party.key)) : null;
+  const chanceBox = document.getElementById("coalChanceBox");
+  chanceBox.hidden = chance === null;
+  const chanceNumber = document.getElementById("coalChance");
+  chanceNumber.textContent = chance === null ? "" : chancePct(chance);
+  chanceNumber.className = chance === null ? "" : likelihoodClass(chance);
+  renderThresholdRisks(members);
+  renderCoalitionTrend();
+  renderSignals();
+}
+
+const chancePct = p => (p > 0 && p < 0.005 ? "<1%" : p > 0.995 && p < 1 ? ">99%" : pct(p));
+const likelihoodClass = p => (p >= 0.6 ? "likely" : p >= 0.25 ? "possible" : "unlikely");
+
+// Draws each party's seats from its own bracket prices, rescales each draw to 120, and counts draws where the picked parties reach 61.
+function simulatedKnessets() {
+  if (lastData.simulated) return lastData.simulated;
+  const keys = lastData.parties.map(v => v.party.key);
+  const draws = Array.from({ length: SIMULATION_DRAWS }, () => {
+    const seats = lastData.parties.map(sampleSeats);
+    const total = seats.reduce((a, b) => a + b, 0);
+    return total > 0 ? seats.map(s => (s / total) * 120) : seats;
+  });
+  lastData.simulated = { keys, draws };
+  return lastData.simulated;
+}
+
+function shareOfDraws(isWin) {
+  const { keys, draws } = simulatedKnessets();
+  const seatsOf = (draw, wanted) => keys.reduce((a, key, i) => a + (wanted.has(key) ? draw[i] : 0), 0);
+  return draws.filter(draw => isWin({ draw, seatsOf })).length / draws.length;
+}
+
+const SURE_TO_PASS = 0.95;
+
+function thresholdRisks(keys) {
+  const { keys: allKeys, draws } = simulatedKnessets();
+  const picked = new Set(keys);
+  const reachesMajority = draw => allKeys.reduce((a, key, i) => a + (picked.has(key) ? draw[i] : 0), 0) >= 60.5;
+  const majorityChanceAmong = group => (group.length ? group.filter(reachesMajority).length / group.length : null);
+  return keys.map(key => {
+    const index = allKeys.indexOf(key);
+    const passed = draws.filter(draw => draw[index] > 0);
+    const missed = draws.filter(draw => draw[index] === 0);
+    const averageOf = ({ group, seatsOf }) => (group.length ? group.reduce((a, draw) => a + seatsOf(draw), 0) / group.length : 0);
+    const partnersSeats = draw => allKeys.reduce((a, other, i) => a + (other !== key && picked.has(other) ? draw[i] : 0), 0);
+    return {
+      key,
+      passChance: passed.length / draws.length,
+      seatsIfPasses: averageOf({ group: passed, seatsOf: draw => draw[index] }),
+      partnersLoseIfPasses: passed.length && missed.length ? averageOf({ group: missed, seatsOf: partnersSeats }) - averageOf({ group: passed, seatsOf: partnersSeats }) : 0,
+      chanceIfPasses: majorityChanceAmong(passed),
+      chanceIfMisses: majorityChanceAmong(missed),
+    };
+  }).filter(risk => risk.passChance < SURE_TO_PASS).sort((a, b) => a.passChance - b.passChance);
+}
+
+function renderThresholdRisks(members) {
+  const list = document.getElementById("coalThresholdRisks");
+  const risks = members.length ? thresholdRisks(members.map(r => r.v.party.key)) : [];
+  list.hidden = !risks.length;
+  list.replaceChildren(...risks.map(risk => {
+    const row = members.find(r => r.v.party.key === risk.key);
+    const item = document.createElement("li");
+    const name = document.createElement("b");
+    name.textContent = row.v.party.name;
+    const netGain = risk.seatsIfPasses - risk.partnersLoseIfPasses;
+    const takesFromPartners = risk.partnersLoseIfPasses >= 0.5 ? `, but about ${Math.round(risk.partnersLoseIfPasses)} of them come out of its partners here, so the coalition nets about ${Math.round(netGain)}` : "";
+    const ifPasses = risk.chanceIfPasses === null ? "" : `If it passes it wins about ${Math.round(risk.seatsIfPasses)} seats${takesFromPartners}. The coalition then reaches 61 in ${chancePct(risk.chanceIfPasses)}`;
+    const ifMisses = risk.chanceIfMisses === null ? "" : `if it misses, ${chancePct(risk.chanceIfMisses)}`;
+    const shownAs = row.seats === 0 ? " Counted as 0 seats in the total above."
+      : row.seats < THRESHOLD_SEATS ? ` Shown as ${row.seats} seats, but it gets either 0 or ${THRESHOLD_SEATS}+.` : "";
+    item.append(name, ` passes the ${THRESHOLD_PCT}% threshold in ${chancePct(risk.passChance)} of runs. ${[ifPasses, ifMisses].filter(Boolean).join("; ")}.${shownAs}`);
+    return item;
+  }));
+}
+
+function coalitionChance(keys) {
+  const picked = new Set(keys);
+  return shareOfDraws(({ draw, seatsOf }) => seatsOf(draw, picked) >= 60.5);
+}
+
+function sampleSeats(v) {
+  if (v.seats) {
+    const b = pickBracket(v.seats.brackets);
+    if (b.value < THRESHOLD_SEATS) return 0;
+    if (b.lo !== null && b.hi !== null) return b.lo + Math.floor(Math.random() * (b.hi - b.lo + 1));
+    return b.value;
+  }
+  if (v.share) return seatsForShare({ sharePct: pickBracket(v.share.brackets).value, wastedPct: lastData.wastedPct });
+  return 0;
+}
+
+const CANDIDATE_LISTS = {"amcha": ["Ofer Winter", "Yoseph Haddad", "Netali Shem Tov", "Eran Ben-Ari", "Fleur Hassan-Nahoum", "Lali Derai", "Ronen Bodner", "Davidi Ben-Zion", "Aviv Ezra", "Sigal Kraunik-Attia", "Eli Gino", "Eric Rubin", "Alam Ibrahim", "Moshe Har-Zion", "Lilach Haim Idelberg", "Moshe Toledano", "Raz Malka", "Dor Yitzhak"], "bluewhite": ["Benny Gantz", "Pnina Tamano-Shata", "Aliza Bloch", "Roee Konkol", "Rotem Avidar Tzalik", "Alon Schuster", "Mufid Mari", "Yerhudit Uliel Malka", "Ariel Baziz", "Moria Silfan"], "democrats": ["Yair Golan", "Naama Lazimi", "Gilad Kariv", "Efrat Rayten", "Yaya Fink", "Gaby Lasky", "Omri Ronen", "Michal Rozin", "Moshe Radman", "Somaya Bashir", "Nimrod Sheffer", "Moran Zer Katzenstein", "Avi Dabush", "Emilie Moatti", "Tomer Avital", "Nava Rozolyo", "Ram Shefa", "Ali Salalha", "Rotem Sivan", "Eran Etzion", "Moran Michel", "Mossi Raz", "Ghaleb Salamaneh", "Katy Piasecki-Morag", "Amir Khnifess", "Mehereta Baruch-Ron", "Ayid Badir", "Chen Arieli", "Gil Beilin", "Yael Cohen Paran", "Eran Nissan", "Hadas Regolsky", "Evyatar Be'er", "Inbal Wertman Shoham", "Binaymin Daniel Minich", "Lee Hoffman-Agiv", "Yaron Niv", "Alice Goldman", "Yoav Agami", "Avishay Liechtenstein", "Olivier Emmanuel De Lame", "Israel Tzvi ben Shaul", "Omer Lubaton Granot", "Hadas Jaeger-Deliger", "Hagar Reuveni", "Yehudit Gilon", "Tal Nevo Abitbul", "Simon Alfasi", "Tomer Reznik", "Dagan Levin", "Silvio Gabriel Joskowicz", "Dror Ish Shalom Morag", "Chaya Cohen", "Orly Biti Shiloah", "Maya Nouri Shaked", "Eran Ben Yehuda", "Roi Barzilai", "Avraham Pardes", "Abd al-Karim Zo'abi", "Noga Botansky", "Shanna Orlik", "Ruth Malka Boneh", "Yuval Schwartz", "Farhan Abu Riash", "Gal Ben David", "Hadas Zangy", "Merav Barkai", "Esther Zakheim Grauss", "Yosef Efrati", "Nicholas Mas'ad", "Limor Levinstein", "Tal Fanz", "Orit Maranda", "Maggie Sela-Weger", "Yaron Gadot", "Dafna Cohen", "Hanna Beit Halachmi", "Tanya Sonya Cohen", "Paz Zemach", "Daniel Azoulay", "Sharon Shalom", "Ido Michaeli", "Dikla Cohen", "Roi Segman", "Avshalom Peled", "Nina Rachel Isakov", "Zvi Nir", "Yanai Rubinstein", "Avraham Mencher Dvori", "Yoram Kendall", "Masha Sheindorf", "Laura Verton", "Hanna Sheindel Peretz", "Irit Filmus", "Talma Alyagon-Roz", "Shmuel Dor", "Frances Ruth Reda'i", "Dedi Zucker", "Yossef Murciano", "Benjamin Zweig", "Yocheved Lifshitz", "Michal Biran", "Hussniya Jabara", "Anat Maor", "Masha Lubelsky", "Amira Sartani", "Avraham Poraz", "Yossi Beilin", "Tamar Zandberg", "Amram Mitzna", "Micha Goldman", "Ran Cohen", "Ra'anan Cohen", "Avshalom Vilan", "Shimon Shetreet", "Zehava Galon", "Colette Avital", "Haim Oron", "Efraim Sneh", "Uzi Baram"], "joint": ["Yousef Jabareen", "Ahmad Tibi", "Faten Ghattas", "Bakhar Awawdeh", "Ofer Cassif", "⁠ Youssef Atauna", "Maha Karkabi", "Ahmed Darawshe", "Nihaya Washahi", "Hassan Nassasra", "Zakhlaka Haitam", "Iyas Natour", "Abdullah Jessan", "Orly Noy", "Mor Stoler", "Iyatmad Qadan", "Omar Wached", "Muid Miyari", "Ghanim Ghazawi", "Umaniya Zoabi"], "likud": ["Benjamin Netanyahu", "Eli Cohen", "Amir Ohana", "Yariv Levin", "Miri Regev", "Israel Katz", "Gideon Sa'ar", "Ofir Katz", "Talik Gvili", "Yoav Kisch", "Yaakov Bardugo", "Miki Zohar", "Almog Cohen", "Amichai Chikli", "Elisha Medan", "David Peter", "Moshe Saada", "Haim Katz", "Dudi Amsalem", "Eti Atiya", "Boaz Bismuth", "David Bitan", "Shlomo Karhi", "Nir Barkat", "Gila Gamliel", "Eli Goldschmidt", "Erez Tadmor", "Shlomo Lerner", "Itzik Bunzel", "Moshe Binyamin Peretz", "Shuki Ohana", "Ze'ev Elkin", "Amit Halevi", "Keren Atiass-Bublil", "Avihai Boaron", "Efi Nave", "Sharon Saada", "Hanoch Milwidsky", "Netanel Ohion", "May Golan"], "noam": ["Avi Maoz", "Shimon Tubul", "Eliyahu Libman", "Liora Alon", "Yaska Haimov", "Yair Avitan", "Eliyahu Ozen", "Meir Eylon", "Babed Elkana", "Eitan Vinberg"], "otzma": ["Itamar Ben-Gvir", "Tally Gotliv", "Yitzhak Wasserlauf", "Amihai Eliyahu", "Limor Son Har-Melech", "Yitzhak Kroizer", "Hanamel Dorfman", "Tzachi Eliyahu", "Yossi Goldberger", "Itiel Ne'eman", "David Babli", "Yishai Fleisher", "Shiran Mirzai", "Shimi Golan", "Yaniv Badelov", "Aychlutm Masala", "Gadi Mazuz", "Mordechai Prizis", "Aharon Amar", "Or Eliya Yomtobian"], "rz": ["Bezalel Smotrich", "Moshe Feiglin", "Orit Strook", "Simcha Rothman", "Tzvika Mor", "Itamar Eitam", "Zvi Sukkot", "Yitzhak Zaga", "Reut Ben Haim", "Omer Patziniach", "Arcady Mutter", "Ohad Tal", "Roei Kirshberg", "Omer Rahamim", "Sima Hasson", "Shmuel Sasson", "Shirel Lalum-Nahir", "Zvika Vishingrad", "Iris Bernstein", "Eitan Tam"], "reservists": ["Yoaz Hendel", "Yaron Zelekha", "Einat Wilf", "Haviv Volibovich", "Yoav Adomi", "Ofir Langman", "Shlomi Dimri", "Lior Gilboa", "Tehila Peretz", "Shalom Biton"], "shas": ["Aryeh Deri", "Yinon Azulai", "Michael Malchieli", "Yoav Ben-Tzur", "Haim Biton", "Dror Amos", "Moshe Abutbul", "Uriel Buso", "Yosef Taieb", "Yonatan Mishraki", "Yosef Alnathanov", "Erez Malul", "Semion Moshiashvili", "Uriel Cohen", "Israel Tzadka", "Rafael Nimni", "Moshe Ben-Naim", "Masiash Rafael Eran Avichai", "Ariel Asher", "Netanel Mor Yosef"], "together": ["Naftali Bennett", "Yair Lapid", "Keren Terner Eyal", "Meirav Ben-Ari", "Liran Avishar Ben-Horin", "Noam Tibon", "Michal Negri", "Eitan Ginzburg", "Meirav Cohen", "Yonatan Shalev", "Bruria Naim Arman", "Ram Ben-Barak", "Amir Strugo", "Naor Shiri", "Nissam Ze'evi", "Vladimir Beliak", "Orly Harel", "Yorai Lahav-Hertzanu", "Shahar Varon", "Yasmin Fridman", "Esti Ayalon Kobo", "Jeremy Saltan", "Neta Attias", "Tzvi Plotnitzky", "Moshe Tur-Paz", "Olessia Kantor", "Simon Davidson", "Mati Gill", "Tomer Wiener", "Shelly Tal Meron", "Tami Muziel", "Roni Malkai", "Yael Stern", "Matti Sarfati Harkavi", "Amit Barda"], "raam": ["Mansour Abbas", "Yoav Segalovitz", "Waleed Taha", "Waleed Alhwashla", "Iman Khatib-Yassin", "Yasir Hujeirat", "Ibrahim Al-Turi", "Abd El-Karim Masri", "Izzam Abd El-Karim", "Ibrahim Abu-Laben"], "utj": ["Ya'akov Asher", "Yitzhak Goldknopf", "Yitzhak Pindrus", "Meir Porush", "Moshe Rosenthal", "Elyakim Stark", "Yehuda Weisfish", "Ya'akov Tessler", "Dudi Zeltz", "David Ohana", "Moshe Roth", "Eliyahu Baruchi", "Israel Porush", "Yitzhak Reich", "Yosef Bahem", "Ya'akov Asher Guterman", "Yossi Daitsh", "Shmuel Greenberg", "Yehiel Aryeh Vinterberg", "Yitzhak Ravitz"], "yashar": ["Gadi Eisenkot", "Yoram Cohen", "Orit Farkash-Hacohen", "Adi Altschuler", "Matan Kahana", "Hili Tropper", "Shaul Meridor", "Tair Ifergan", "Oshrat Gani Gonen", "Shira Shapira", "Inbar Harush Gity", "Elazar Stern", "Kamil Abu Rokon", "Devorah Sharifian Bachar", "Alex Rif", "Inbar Yehezkeli", "Roy Folkman", "Israel Zari", "Tal Ohana", "Elisaf Peretz", "Yaffa Tabaja", "Nir Hagbi", "Ron Barkai", "Shay Fisher", "Lian Folk David", "Roee Cohen", "Ziv Rosen", "Jocelyn Bash", "Alon Futerman", "Tali Molner", "Gil Avriel", "Shiran Ben David Ozeri", "Eliran Aryeh", "Helen Gelber", "Shlomi Yehiav", "Hila Meir", "Ran Ben-Ariya Yitzkan", "May Sachs Elianna", "Gideon Zaga", "Moshe Davidovich"], "yb": ["Avigdor Lieberman", "Rafi Ben Shitrit", "Talya Lankri", "Oded Forer", "Yulia Malinovsky", "Sharon Sharabi", "Hamad Amar", "Evgeny Sova", "Elvira Kolihman", "Dan Illouz", "Lily Ben Ami", "Yael Benvenisti", "David Azoulay", "Limor Magen Telem", "Israel Ben Shitrit", "Sharon Roffe Ofir", "Mor Dekel", "Michaela Levin-Shamir", "Olivier Rafowicz", "Yaakov (Yanki) Mozes"]};
+const CANDIDATE_LISTS_SOURCE = "https://en.wikipedia.org/wiki/Party_lists_for_the_2026_Israeli_legislative_election";
+
+const wikipediaProfileByName = new Map();
+const LOOKS_LIKE_ISRAELI_PUBLIC_FIGURE = /israel|knesset|palestin|arab|politic|rabbi|haredi|druze|bedouin|idf|military|journalist|activist/i;
+
+const WIKIPEDIA_TITLES_PER_REQUEST = 50;
+const wikipediaSearchUrl = name => `https://en.wikipedia.org/w/index.php?search=${encodeURIComponent(name)}`;
+
+async function fetchWikipediaProfiles(names) {
+  const url = `https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*&redirects=1&prop=pageimages%7Cdescription&piprop=thumbnail&pithumbsize=160&titles=${encodeURIComponent(names.join("|"))}`;
+  const body = await fetch(url).then(response => (response.ok ? response.json() : null)).catch(() => null);
+  const query = body?.query || {};
+  const finalTitleOf = title => {
+    const normalized = (query.normalized || []).find(entry => entry.from === title)?.to ?? title;
+    return (query.redirects || []).find(entry => entry.from === normalized)?.to ?? normalized;
+  };
+  const pageByTitle = Object.fromEntries(Object.values(query.pages || {}).map(page => [page.title, page]));
+  return Object.fromEntries(names.map(name => {
+    const page = pageByTitle[finalTitleOf(name)];
+    const isTheRightPerson = page && page.missing === undefined && LOOKS_LIKE_ISRAELI_PUBLIC_FIGURE.test(page.description || "");
+    return [name, isTheRightPerson
+      ? { photo: page.thumbnail?.source, description: page.description, url: `https://en.wikipedia.org/wiki/${encodeURIComponent(page.title.replaceAll(" ", "_"))}` }
+      : null];
+  }));
+}
+
+function preloadWikipediaProfiles(names) {
+  const unseen = [...new Set(names)].filter(name => !wikipediaProfileByName.has(name));
+  for (let start = 0; start < unseen.length; start += WIKIPEDIA_TITLES_PER_REQUEST) {
+    const batch = fetchWikipediaProfiles(unseen.slice(start, start + WIKIPEDIA_TITLES_PER_REQUEST));
+    for (const name of unseen.slice(start, start + WIKIPEDIA_TITLES_PER_REQUEST)) {
+      wikipediaProfileByName.set(name, batch.then(profiles => {
+        const profile = profiles[name];
+        if (profile?.photo) new Image().src = profile.photo;
+        return profile;
+      }));
+    }
+  }
+}
+
+function wikipediaProfile(name) {
+  preloadWikipediaProfiles([name]);
+  return wikipediaProfileByName.get(name);
+}
+
+const initialsOf = name => name.split(/[\s-]+/).filter(Boolean).slice(0, 2).map(part => part[0]).join("").toUpperCase();
+
+function candidateCardElement() {
+  let card = document.getElementById("candidateCard");
+  if (!card) {
+    card = document.createElement("div");
+    card.id = "candidateCard";
+    card.setAttribute("role", "tooltip");
+    card.innerHTML = `<a class="photo" target="_blank" rel="noopener"></a><div class="details"><a class="name" target="_blank" rel="noopener"></a><div class="description"></div><div class="party"></div><div class="slot"></div><div class="hint"></div></div>`;
+    card.addEventListener("mouseenter", () => clearTimeout(hideCandidateCardTimer));
+    card.addEventListener("mouseleave", hideCandidateCard);
+    document.body.append(card);
+  }
+  return card;
+}
+
+const CANDIDATE_CARD_HIDE_DELAY_MS = 250;
+let hoveredSeatToken = 0;
+let hideCandidateCardTimer;
+
+function setCandidateLinks({ card, url, label }) {
+  for (const link of card.querySelectorAll("a.photo, a.name")) {
+    link.href = url;
+    link.title = label;
+  }
+}
+
+function showCandidateCard({ row, listPosition, isPicked, anchor }) {
+  clearTimeout(hideCandidateCardTimer);
+  const seatToken = ++hoveredSeatToken;
+  const party = row.v.party;
+  const name = CANDIDATE_LISTS[party.key]?.[listPosition - 1];
+  const card = candidateCardElement();
+  const photo = card.querySelector(".photo");
+  photo.replaceChildren(document.createTextNode(name ? initialsOf(name) : "?"));
+  photo.style.background = `hsl(${party.hue} 45% 45%)`;
+  card.querySelector(".name").textContent = name ?? `Seat ${listPosition}`;
+  setCandidateLinks({ card, url: name ? wikipediaSearchUrl(name) : CANDIDATE_LISTS_SOURCE, label: name ? `Search Wikipedia for ${name}` : "Party lists on Wikipedia" });
+  card.querySelector(".description").textContent = name ? "" : "This party's list is not published on Wikipedia";
+  const partyLine = card.querySelector(".party");
+  partyLine.replaceChildren(logoFor(row.v, "small"), document.createTextNode(party.name));
+  const isLastSeatIn = listPosition === row.seats;
+  card.querySelector(".slot").textContent = `#${listPosition} on the list · the party wins ${row.seats} seats on today's numbers${isLastSeatIn ? ", so this is the last one in" : ""}`;
+  card.querySelector(".hint").textContent = `Click to ${isPicked ? "remove" : "add"} ${party.name} ${isPicked ? "from" : "to"} the coalition`;
+  const seatBox = anchor.getBoundingClientRect();
+  card.classList.add("visible");
+  const cardBox = card.getBoundingClientRect();
+  const left = Math.min(window.innerWidth - cardBox.width - 8, Math.max(8, seatBox.left + seatBox.width / 2 - cardBox.width / 2));
+  const top = seatBox.top - cardBox.height - 10 >= 8 ? seatBox.top - cardBox.height - 10 : seatBox.bottom + 10;
+  card.style.left = `${left}px`;
+  card.style.top = `${top}px`;
+  if (!name) return;
+  wikipediaProfile(name).then(profile => {
+    if (!profile || seatToken !== hoveredSeatToken) return;
+    card.querySelector(".description").textContent = profile.description || "";
+    setCandidateLinks({ card, url: profile.url, label: `${name} on Wikipedia` });
+    if (profile.photo) {
+      const img = document.createElement("img");
+      img.alt = name;
+      img.src = profile.photo;
+      img.addEventListener("load", () => { if (seatToken === hoveredSeatToken) photo.replaceChildren(img); }, { once: true });
+    }
+  });
+}
+
+function hideCandidateCard() {
+  clearTimeout(hideCandidateCardTimer);
+  hideCandidateCardTimer = setTimeout(() => {
+    hoveredSeatToken++;
+    document.getElementById("candidateCard")?.classList.remove("visible");
+  }, CANDIDATE_CARD_HIDE_DELAY_MS);
+}
+
+function drawHemicycle(rows, colors) {
+  const order = BLOCS.map(b => b.key);
+  const lastBloc = order[order.length - 1];
+  const seq = order.flatMap(k => rows.filter(r => blocOf(r.v.party) === k && r.seats > 0).sort((a, c) => (k === lastBloc ? a.seats - c.seats : c.seats - a.seats)));
+  const ROWS = 6, COLUMNS = 20, INNER_RADIUS = 0.5, OUTER_RADIUS = 1;
+  const seats = [];
+  for (let column = 0; column < COLUMNS; column++) {
+    const theta = Math.PI - ((column + 0.5) * Math.PI) / COLUMNS;
+    for (let row = 0; row < ROWS; row++) {
+      const r = INNER_RADIUS + (row * (OUTER_RADIUS - INNER_RADIUS)) / (ROWS - 1);
+      seats.push({ x: r * Math.cos(theta), y: -r * Math.sin(theta), size: 0.036 + 0.024 * (r - INNER_RADIUS) });
+    }
+  }
+  const owners = seq.flatMap(r => Array(r.seats).fill(r));
+  const listPositionOfSeat = [];
+  const seatsTakenByKey = {};
+  owners.forEach((row, i) => {
+    const key = row.v.party.key;
+    seatsTakenByKey[key] = (seatsTakenByKey[key] || 0) + 1;
+    listPositionOfSeat[i] = seatsTakenByKey[key];
+  });
+  preloadWikipediaProfiles(owners.map((row, i) => CANDIDATE_LISTS[row.v.party.key]?.[listPositionOfSeat[i] - 1]).filter(Boolean));
+  const picked = pickedParties();
+  const svg = document.getElementById("hemi");
+  const ns = "http://www.w3.org/2000/svg";
+  svg.classList.toggle("has-picked", picked.size > 0);
+  svg.replaceChildren(...seats.map((s, i) => {
+    const c = document.createElementNS(ns, "circle");
+    c.setAttribute("cx", s.x.toFixed(4));
+    c.setAttribute("cy", s.y.toFixed(4));
+    c.setAttribute("r", s.size.toFixed(4));
+    c.setAttribute("fill", owners[i] ? colors[owners[i].v.party.key] : cssVar("--line"));
+    if (owners[i]) {
+      const key = owners[i].v.party.key;
+      if (picked.has(key)) c.classList.add("picked");
+      const seatInfo = { row: owners[i], listPosition: listPositionOfSeat[i], isPicked: picked.has(key) };
+      c.addEventListener("mouseenter", event => showCandidateCard({ ...seatInfo, anchor: event.currentTarget }));
+      c.addEventListener("mouseleave", hideCandidateCard);
+      c.addEventListener("click", () => { hideCandidateCard(); togglePicked(key); });
+    }
+    return c;
+  }));
+  const pickedSeats = seq.filter(r => picked.has(r.v.party.key)).reduce((a, r) => a + r.seats, 0);
+  const majorityLine = document.createElementNS(ns, "line");
+  Object.entries({ x1: 0, y1: -(INNER_RADIUS - 0.08), x2: 0, y2: -(OUTER_RADIUS + 0.05), stroke: cssVar("--fg"), "stroke-width": 0.008, "stroke-dasharray": "0.025 0.02" })
+    .forEach(([name, value]) => majorityLine.setAttribute(name, String(value)));
+  svg.append(majorityLine);
+  const hasMajority = pickedSeats >= 61;
+  const centerLabels = picked.size
+    ? [[`${pickedSeats} seats`, -0.2, "0.1", "--fg"], [hasMajority ? `majority, ${pickedSeats - 60} to spare` : `${61 - pickedSeats} short of 61`, -0.06, "0.065", hasMajority ? "--good" : "--bad"]]
+    : [["120 seats", -0.2, "0.1", "--muted"], ["61 to govern", -0.06, "0.07", "--muted"]];
+  centerLabels.forEach(([text, y, size, colorVar]) => {
+    const t = document.createElementNS(ns, "text");
+    t.setAttribute("x", "0"); t.setAttribute("y", String(y));
+    t.setAttribute("text-anchor", "middle"); t.setAttribute("font-size", size);
+    t.setAttribute("font-family", "IBM Plex Mono, monospace"); t.setAttribute("fill", cssVar(colorVar));
+    t.textContent = text;
+    svg.append(t);
+  });
+}
+
+async function loadTrend() {
+  isLoadingTrend = true;
+  try { await loadTrendHistory(); } finally { isLoadingTrend = false; }
+}
+
+async function loadTrendHistory() {
+  const trendStatus = document.getElementById("trendStatus");
+  trendStatus.textContent = "Loading price history…";
+  const jobs = [];
+  for (const v of lastData.parties) {
+    for (const [kind, s] of [["seats", v.seats], ["share", v.share]]) {
+      for (const b of s?.brackets || []) if (b.token) jobs.push({ b, kind });
+    }
+  }
+  const trendWindow = currentTrendWindow();
+  const startSeconds = Math.floor((Date.now() - trendWindow.spanMs) / 1000);
+  const histories = await mapLimit(jobs, 8, ({ b }) => getJson(`${CLOB}/prices-history?market=${b.token}&startTs=${startSeconds}&fidelity=${trendWindow.fidelityMinutes}`));
+  if (trendWindow.key !== currentTrendWindow().key) return;
+  const got = histories.filter(h => h && (h.history || []).length).length;
+  historyByToken.clear();
+  jobs.forEach((job, i) => {
+    const points = (histories[i]?.history || []).map(pt => ({ t: pt.t * 1000, p: Number(pt.p) })).sort((a, c) => a.t - c.t);
+    if (points.length) historyByToken.set(job.b.token, points);
+  });
+  if (!got) { trendStatus.textContent = "Couldn't load price history from Polymarket (blocked or unavailable)."; return; }
+  trendData = { at: Date.now(), windowKey: trendWindow.key };
+  computeTrend();
+  trendStatus.textContent = `${got} of ${jobs.length} brackets have history · a point every ${formatSpan(trendWindow.stepMs)} · history refreshes every 5 min`;
+  render();
+}
+
+function currentTrendWindow() {
+  const key = store.get("kmp-window", "24h");
+  return TREND_WINDOWS.find(w => w.key === key) || TREND_WINDOWS[1];
+}
+
+const formatSpan = ms => (ms >= HOUR_MS ? `${ms / HOUR_MS}h` : `${ms / 60e3} min`);
+
+function renderTrendWindows() {
+  const active = currentTrendWindow();
+  document.getElementById("trendTitle").textContent = `Trend, last ${active.label}`;
+  document.getElementById("deltaNote").textContent = `Small number: change over the last ${active.label}`;
+  document.getElementById("deltaHeader").textContent = active.label;
+  document.getElementById("trendWindows").replaceChildren(...TREND_WINDOWS.map(w => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = w.label;
+    b.setAttribute("aria-pressed", String(w.key === active.key));
+    b.addEventListener("click", () => {
+      if (w.key === currentTrendWindow().key) return;
+      store.set("kmp-window", w.key);
+      trendData = null;
+      renderTrendWindows();
+      if (lastData) loadTrend();
+    });
+    return b;
+  }));
+}
+
+function priceAt(b, t) {
+  const h = historyByToken.get(b.token) || [];
+  if (!h.length) return b.price;
+  let p = h[0].p;
+  for (const pt of h) { if (pt.t > t) break; p = pt.p; }
+  return p;
+}
+
+function computeTrend() {
+  if (!trendData) return;
+  const mode = document.getElementById("mode").value;
+  const end = Date.now();
+  const { spanMs, stepMs } = currentTrendWindow();
+  const times = [];
+  for (let t = end - spanMs; t < end; t += stepMs) times.push(t);
+  times.push(end);
+  const series = Object.fromEntries(lastData.parties.map(v => [v.party.key, []]));
+  const snapshots = [];
+  for (const t of times) {
+    const isNow = t === end;
+    const snapshot = lastData.parties.map(v => {
+      const at = s => s && summarise(s.brackets.map(b => ({ lo: b.lo, hi: b.hi, label: b.label, price: isNow ? b.price : priceAt(b, t) })), { integer: s === v.seats });
+      const seats = at(v.seats);
+      const share = at(v.share);
+      const shareModel = share ? shareSeatModel({ share, wastedPct: lastData.wastedPct }) : undefined;
+      return { ...v, seats: seats || undefined, share: share || undefined, shareModel, shareSeats: shareModel?.expected };
+    });
+    const scaled = scaleTo120(snapshot.map(v => modelInputs(v, mode).base));
+    snapshot.forEach((v, i) => series[v.party.key].push({ x: t, y: scaled[i] }));
+    snapshots.push({ t, parties: snapshot });
+  }
+  trendData = { ...trendData, mode, series, end, snapshots };
+  coalitionTrendCache = null;
+}
+
+const COALITION_TREND_DRAWS = 1500;
+let coalitionTrendCache = null;
+let coalitionTrendChart = null;
+
+function chanceAtSnapshot({ parties, picked }) {
+  let wins = 0;
+  for (let draw = 0; draw < COALITION_TREND_DRAWS; draw++) {
+    const seats = parties.map(sampleSeats);
+    const total = seats.reduce((a, b) => a + b, 0);
+    if (total <= 0) continue;
+    const pickedSeats = parties.reduce((a, v, i) => a + (picked.has(v.party.key) ? seats[i] : 0), 0);
+    if ((pickedSeats / total) * 120 >= 60.5) wins++;
+  }
+  return wins / COALITION_TREND_DRAWS;
+}
+
+function coalitionChanceOverTime(keys) {
+  if (!trendData?.snapshots?.length) return null;
+  const cacheKey = `${[...keys].sort().join(",")}|${trendData.end}`;
+  if (coalitionTrendCache?.cacheKey === cacheKey) return coalitionTrendCache.points;
+  const picked = new Set(keys);
+  const points = trendData.snapshots.map((snapshot, index) => ({
+    x: snapshot.t,
+    y: (index === trendData.snapshots.length - 1 ? coalitionChance(keys) : chanceAtSnapshot({ parties: snapshot.parties, picked })) * 100,
+  }));
+  coalitionTrendCache = { cacheKey, points };
+  return points;
+}
+
+function formatTrendTick(timeMs) {
+  const isShortWindow = currentTrendWindow().spanMs <= 24 * 60 * 60 * 1000;
+  return isShortWindow
+    ? new Date(timeMs).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })
+    : new Date(timeMs).toLocaleDateString(undefined, { weekday: "short", day: "numeric" });
+}
+
+function renderCoalitionTrend() {
+  const wrap = document.getElementById("coalTrendWrap");
+  const keys = [...pickedParties()];
+  const points = keys.length && typeof Chart !== "undefined" ? coalitionChanceOverTime(keys) : null;
+  wrap.hidden = !points;
+  if (!points) return;
+  document.getElementById("coalTrendTitle").textContent = `Over the last ${formatSpan(currentTrendWindow().spanMs)}`;
+  const fg = cssVar("--muted"), grid = cssVar("--line"), line = cssVar("--accent");
+  const options = {
+    responsive: true, maintainAspectRatio: false, animation: false,
+    interaction: { mode: "index", intersect: false },
+    scales: {
+      x: { type: "linear", min: points[0].x, max: points.at(-1).x, ticks: { color: fg, maxTicksLimit: 5, callback: formatTrendTick }, grid: { display: false } },
+      y: { min: 0, max: 100, ticks: { color: fg, maxTicksLimit: 3, callback: v => `${v}%` }, grid: { color: grid } },
+    },
+    plugins: {
+      legend: { display: false },
+      tooltip: { callbacks: { title: items => new Date(items[0].parsed.x).toLocaleString(), label: c => `Chance of 61+: ${c.parsed.y.toFixed(0)}%` } },
+    },
+  };
+  const dataset = { data: points, borderColor: line, backgroundColor: `${line}2e`, fill: true, pointRadius: 0, borderWidth: 2, tension: 0.3 };
+  if (coalitionTrendChart) {
+    coalitionTrendChart.data.datasets = [dataset];
+    coalitionTrendChart.options = options;
+    coalitionTrendChart.update("none");
+  } else {
+    coalitionTrendChart = new Chart(document.getElementById("coalTrend"), { type: "line", data: { datasets: [dataset] }, options });
+  }
+}
+
+function renderTrend() {
+  if (!trendData || typeof Chart === "undefined") return;
+  if (trendData.mode !== document.getElementById("mode").value) computeTrend();
+  const { rows, colors } = currentView();
+  let datasets;
+  if (trendView === "parties") {
+    datasets = rows.map(r => ({ label: r.v.party.name, data: trendData.series[r.v.party.key], borderColor: colors[r.v.party.key], backgroundColor: colors[r.v.party.key] }));
+  } else {
+    datasets = BLOCS.map(b => {
+      const members = rows.filter(r => blocOf(r.v.party) === b.key);
+      if (!members.length) return null;
+      const base = trendData.series[members[0].v.party.key];
+      const data = base.map((pt, i) => ({ x: pt.x, y: members.reduce((a, r) => a + trendData.series[r.v.party.key][i].y, 0) }));
+      const color = `hsl(${b.hue} ${b.sat}% ${isDark() ? 66 : 46}%)`;
+      return { label: b.name, data, borderColor: color, backgroundColor: color };
+    }).filter(Boolean);
+  }
+  datasets.forEach(d => Object.assign(d, { pointRadius: 0, borderWidth: 2, tension: 0.25 }));
+  const fg = cssVar("--muted"), grid = cssVar("--line");
+  const options = {
+    responsive: true, maintainAspectRatio: false, animation: false,
+    interaction: { mode: "index", intersect: false },
+    scales: {
+      x: { type: "linear", ticks: { color: fg, maxTicksLimit: 8, callback: v => new Date(v).toLocaleDateString(undefined, { weekday: "short", day: "numeric" }) }, grid: { color: grid } },
+      y: { beginAtZero: trendView === "parties", ticks: { color: fg }, grid: { color: grid }, title: { display: true, text: "Seats", color: fg } },
+    },
+    plugins: {
+      legend: { position: "bottom", labels: { color: fg, boxWidth: 10, boxHeight: 10 } },
+      tooltip: { callbacks: { title: items => new Date(items[0].parsed.x).toLocaleString(), label: c => `${c.dataset.label}: ${c.parsed.y.toFixed(1)}` } },
+    },
+  };
+  if (chart) {
+    chart.data.datasets = datasets;
+    chart.options = options;
+    chart.update("none");
+  } else {
+    chart = new Chart(document.getElementById("trend"), { type: "line", data: { datasets }, options });
+  }
+  renderCoalitionTrend();
+}
+
+function setTrendView(view) {
+  trendView = view;
+  document.getElementById("trendParties").setAttribute("aria-pressed", String(view === "parties"));
+  document.getElementById("trendBlocs").setAttribute("aria-pressed", String(view === "blocs"));
+  renderTrend();
+}
+
+document.getElementById("refresh").addEventListener("click", () => { trendData = null; refresh(); });
+document.getElementById("mode").addEventListener("change", () => { if (trendData) computeTrend(); render(); });
+document.getElementById("trendParties").addEventListener("click", () => setTrendView("parties"));
+document.getElementById("trendBlocs").addEventListener("click", () => setTrendView("blocs"));
+const proxyInput = document.getElementById("proxy");
+proxyInput.value = store.get("kmp-proxy", "");
+proxyInput.addEventListener("change", () => { store.set("kmp-proxy", proxyInput.value); refresh(); });
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", render);
+const daysToElection = Math.round((new Date(`${ELECTION_DAY}T00:00:00`) - new Date(new Date().toDateString())) / 86400e3);
+document.getElementById("countdown").textContent = daysToElection === 0 ? " (today)" : daysToElection === 1 ? " (tomorrow)" : daysToElection > 1 ? ` (in ${daysToElection} days)` : "";
+renderTrendWindows();
+refresh();
+setInterval(refresh, REFRESH_MS);
+setInterval(updateLiveTicker, 1000);
+
+function updateLiveTicker() {
+  const ticker = document.getElementById("liveTicker");
+  if (!lastData) return;
+  const agoSeconds = Math.round((Date.now() - lastData.at) / 1000);
+  const nextSeconds = Math.max(0, Math.round(REFRESH_MS / 1000) - agoSeconds);
+  ticker.hidden = false;
+  ticker.textContent = isRefreshing ? "Live · updating…" : `Live · updated ${agoSeconds}s ago · next in ${nextSeconds}s`;
+}
+</script>
+</body>
+</html>
