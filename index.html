@@ -101,6 +101,8 @@ svg.hemi { width: 100%; height: auto; display: block; }
 .chip.below-threshold { opacity: .6; border-style: dashed; }
 .party-query { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 14px; }
 .party-query input { width: 72px; font: 500 14px var(--mono); padding: 7px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); }
+.query-seats { display: inline-flex; align-items: center; gap: 8px; }
+.query-seats[hidden] { display: none; }
 .party-query-result { display: grid; grid-template-columns: minmax(200px, 1fr) 2fr; gap: 16px; align-items: start; padding-top: 10px; }
 @media (max-width: 720px) { .party-query-result { grid-template-columns: 1fr; } }
 .party-trend-chart { position: relative; height: 200px; }
@@ -310,7 +312,7 @@ input[type=text] { font: 13px var(--mono); width: 100%; max-width: 420px; paddin
         <div id="coalVerdict" class="verdict"></div>
         <div class="bigchance" id="coalChanceBox" hidden>
           <b id="coalChance"></b>
-          <span>chance these parties reach 61+ seats, from 4,000 simulated results</span>
+          <span>chance these parties reach 61+ seats, from 20,000 simulated results</span>
         </div>
         <ul class="threshold-risks" id="coalThresholdRisks" hidden></ul>
         <div class="chance-trend" id="coalTrendWrap" hidden>
@@ -329,9 +331,14 @@ input[type=text] { font: 13px var(--mono); width: 100%; max-width: 420px; paddin
     <div class="party-query">
       <label for="queryParty">Chance that</label>
       <select id="queryParty" autocomplete="off"></select>
-      <label for="querySeats">wins at least</label>
-      <input id="querySeats" type="number" inputmode="numeric" min="1" max="120" step="1" autocomplete="off">
-      <span>seats</span>
+      <select id="queryGoal" autocomplete="off" aria-label="What to check">
+        <option value="seats">wins at least</option>
+        <option value="pass">passes the 3.25% threshold</option>
+      </select>
+      <span class="query-seats" id="querySeatsFields">
+        <input id="querySeats" type="number" inputmode="numeric" min="1" max="120" step="1" autocomplete="off" aria-label="Seats">
+        <span>seats</span>
+      </span>
     </div>
     <div class="party-query-result">
       <div class="bigchance">
@@ -391,7 +398,7 @@ input[type=text] { font: 13px var(--mono); width: 100%; max-width: 420px; paddin
         <p><b>Kalshi.</b> Kalshi's seat-count markets ask "more than N seats?". The gaps between thresholds become brackets, and the same expected-seats sum is applied. Kalshi refuses requests made from a browser page, so its numbers only appear when the page runs from <code>knesset-poll-server.py</code> or through a CORS proxy.</p>
         <p><b>Models.</b> <i>Expected seats</i>: each party's seat-range expectation, scaled together to 120 and rounded by largest remainder; a party near the threshold can show 1–3 seats, which no real Knesset allows. <i>Likely Knesset</i>: parties under a 50% chance of passing the threshold get 0, the rest get their expected seats assuming they pass. <i>Blend</i>: seat-range and vote-share estimates averaged by each market's liquidity, then scaled.</p>
         <p><b>Coalition chance.</b> Each simulated result draws every party's seats from its own brackets and rescales the total to 120. So when a small party passes the threshold, its seats come out of every other party in proportion to its size, and when it misses, its votes are wasted and everyone else grows. The markets don't say whose voters a party takes, so this assumes evenly from everyone.</p>
-        <p><b>Simulation.</b> 4,000 Knessets are drawn, each party's seats from its own bracket prices independently, then scaled to 120. Parties are not independent in reality (votes moving between two lists), so treat the bloc chances as rough.</p>
+        <p><b>Simulation.</b> 20,000 Knessets are drawn, each party's seats from its own bracket prices independently, then scaled to 120. The over-time graphs replay the same random draws at every point, 4,000 per point, so a line moves only when prices move. Parties are not independent in reality (votes moving between two lists), so treat the bloc chances as rough.</p>
         <p><b>Live.</b> Prices reload every minute. The trend uses Polymarket's price history for every bracket over the chosen window (6 hours to 7 days), reloaded every 5 minutes; its last point is always the live price, and the small change numbers compare it with the start of the window.</p>
         <p><b>Volume</b> is lifetime USD traded and does not weight the seats. Depth: high ≥ $250K, medium ≥ $25K, low below that. These are betting prices, not an opinion poll.</p>
         <p><label for="proxy">If your browser blocks the requests, put a CORS proxy prefix here (saved in this browser):</label><br><input id="proxy" type="text" placeholder="e.g. https://your-proxy.example/?url="></p>
@@ -425,7 +432,7 @@ const TREND_WINDOWS = [
 const THRESHOLD_SEATS = 4;
 const THRESHOLD_PCT = 3.25;
 const DEFAULT_WASTED_PCT = 5;
-const SIMULATION_DRAWS = 4000;
+const SIMULATION_DRAWS = 20000;
 const ELECTION_DAY = "2026-10-27";
 
 // Blocs follow the markets' own definitions (Kalshi's bloc-majority series), so the bloc totals compare with those prices.
@@ -600,10 +607,20 @@ function shareSeatModel({ share, wastedPct }) {
   return { expected, pPass: share.pPass, expectedIfPass: share.pPass > 0 ? expected / share.pPass : 0 };
 }
 
-function pickBracket(brackets) {
-  let u = Math.random();
+function pickBracket({ brackets, roll }) {
+  let u = roll;
   for (const b of brackets) { u -= b.p; if (u <= 0) return b; }
   return brackets[brackets.length - 1];
+}
+
+const sharedRollsByParty = new Map();
+function sharedRollsOf(partyKey) {
+  if (!sharedRollsByParty.has(partyKey)) {
+    const rolls = new Float64Array(SIMULATION_DRAWS * 2);
+    for (let i = 0; i < rolls.length; i++) rolls[i] = Math.random();
+    sharedRollsByParty.set(partyKey, rolls);
+  }
+  return sharedRollsByParty.get(partyKey);
 }
 
 function polyPrice(market) {
@@ -1215,8 +1232,8 @@ const likelihoodClass = p => (p >= 0.6 ? "likely" : p >= 0.25 ? "possible" : "un
 function simulatedKnessets() {
   if (lastData.simulated) return lastData.simulated;
   const keys = lastData.parties.map(v => v.party.key);
-  const draws = Array.from({ length: SIMULATION_DRAWS }, () => {
-    const seats = lastData.parties.map(sampleSeats);
+  const draws = Array.from({ length: SIMULATION_DRAWS }, (_, draw) => {
+    const seats = lastData.parties.map(v => sampleSeats({ v, draw }));
     const total = seats.reduce((a, b) => a + b, 0);
     return total > 0 ? seats.map(s => (s / total) * 120) : seats;
   });
@@ -1279,16 +1296,20 @@ function coalitionChance(keys) {
   return shareOfDraws(({ draw, seatsOf }) => seatsOf(draw, picked) >= 60.5);
 }
 
-function sampleSeats(v) {
+function sampleSeats({ v, draw }) {
+  const rolls = sharedRollsOf(v.party.key);
+  const bracketRoll = rolls[draw * 2], withinBracketRoll = rolls[draw * 2 + 1];
   if (v.seats) {
-    const b = pickBracket(v.seats.brackets);
+    const b = pickBracket({ brackets: v.seats.brackets, roll: bracketRoll });
     if (b.value < THRESHOLD_SEATS) return 0;
-    if (b.lo !== null && b.hi !== null) return b.lo + Math.floor(Math.random() * (b.hi - b.lo + 1));
+    if (b.lo !== null && b.hi !== null) return b.lo + Math.floor(withinBracketRoll * (b.hi - b.lo + 1));
     return b.value;
   }
-  if (v.share) return seatsForShare({ sharePct: pickBracket(v.share.brackets).value, wastedPct: lastData.wastedPct });
+  if (v.share) return seatsForShare({ sharePct: pickBracket({ brackets: v.share.brackets, roll: bracketRoll }).value, wastedPct: lastData.wastedPct });
   return 0;
 }
+
+const roundedSeats = scaledSeats => (scaledSeats > 0 ? Math.max(THRESHOLD_SEATS, Math.round(scaledSeats)) : 0);
 
 const CANDIDATE_LISTS = {"amcha": ["Ofer Winter", "Yoseph Haddad", "Netali Shem Tov", "Eran Ben-Ari", "Fleur Hassan-Nahoum", "Lali Derai", "Ronen Bodner", "Davidi Ben-Zion", "Aviv Ezra", "Sigal Kraunik-Attia", "Eli Gino", "Eric Rubin", "Alam Ibrahim", "Moshe Har-Zion", "Lilach Haim Idelberg", "Moshe Toledano", "Raz Malka", "Dor Yitzhak"], "bluewhite": ["Benny Gantz", "Pnina Tamano-Shata", "Aliza Bloch", "Roee Konkol", "Rotem Avidar Tzalik", "Alon Schuster", "Mufid Mari", "Yerhudit Uliel Malka", "Ariel Baziz", "Moria Silfan"], "democrats": ["Yair Golan", "Naama Lazimi", "Gilad Kariv", "Efrat Rayten", "Yaya Fink", "Gaby Lasky", "Omri Ronen", "Michal Rozin", "Moshe Radman", "Somaya Bashir", "Nimrod Sheffer", "Moran Zer Katzenstein", "Avi Dabush", "Emilie Moatti", "Tomer Avital", "Nava Rozolyo", "Ram Shefa", "Ali Salalha", "Rotem Sivan", "Eran Etzion", "Moran Michel", "Mossi Raz", "Ghaleb Salamaneh", "Katy Piasecki-Morag", "Amir Khnifess", "Mehereta Baruch-Ron", "Ayid Badir", "Chen Arieli", "Gil Beilin", "Yael Cohen Paran", "Eran Nissan", "Hadas Regolsky", "Evyatar Be'er", "Inbal Wertman Shoham", "Binaymin Daniel Minich", "Lee Hoffman-Agiv", "Yaron Niv", "Alice Goldman", "Yoav Agami", "Avishay Liechtenstein", "Olivier Emmanuel De Lame", "Israel Tzvi ben Shaul", "Omer Lubaton Granot", "Hadas Jaeger-Deliger", "Hagar Reuveni", "Yehudit Gilon", "Tal Nevo Abitbul", "Simon Alfasi", "Tomer Reznik", "Dagan Levin", "Silvio Gabriel Joskowicz", "Dror Ish Shalom Morag", "Chaya Cohen", "Orly Biti Shiloah", "Maya Nouri Shaked", "Eran Ben Yehuda", "Roi Barzilai", "Avraham Pardes", "Abd al-Karim Zo'abi", "Noga Botansky", "Shanna Orlik", "Ruth Malka Boneh", "Yuval Schwartz", "Farhan Abu Riash", "Gal Ben David", "Hadas Zangy", "Merav Barkai", "Esther Zakheim Grauss", "Yosef Efrati", "Nicholas Mas'ad", "Limor Levinstein", "Tal Fanz", "Orit Maranda", "Maggie Sela-Weger", "Yaron Gadot", "Dafna Cohen", "Hanna Beit Halachmi", "Tanya Sonya Cohen", "Paz Zemach", "Daniel Azoulay", "Sharon Shalom", "Ido Michaeli", "Dikla Cohen", "Roi Segman", "Avshalom Peled", "Nina Rachel Isakov", "Zvi Nir", "Yanai Rubinstein", "Avraham Mencher Dvori", "Yoram Kendall", "Masha Sheindorf", "Laura Verton", "Hanna Sheindel Peretz", "Irit Filmus", "Talma Alyagon-Roz", "Shmuel Dor", "Frances Ruth Reda'i", "Dedi Zucker", "Yossef Murciano", "Benjamin Zweig", "Yocheved Lifshitz", "Michal Biran", "Hussniya Jabara", "Anat Maor", "Masha Lubelsky", "Amira Sartani", "Avraham Poraz", "Yossi Beilin", "Tamar Zandberg", "Amram Mitzna", "Micha Goldman", "Ran Cohen", "Ra'anan Cohen", "Avshalom Vilan", "Shimon Shetreet", "Zehava Galon", "Colette Avital", "Haim Oron", "Efraim Sneh", "Uzi Baram"], "joint": ["Yousef Jabareen", "Ahmad Tibi", "Faten Ghattas", "Bakhar Awawdeh", "Ofer Cassif", "⁠ Youssef Atauna", "Maha Karkabi", "Ahmed Darawshe", "Nihaya Washahi", "Hassan Nassasra", "Zakhlaka Haitam", "Iyas Natour", "Abdullah Jessan", "Orly Noy", "Mor Stoler", "Iyatmad Qadan", "Omar Wached", "Muid Miyari", "Ghanim Ghazawi", "Umaniya Zoabi"], "likud": ["Benjamin Netanyahu", "Eli Cohen", "Amir Ohana", "Yariv Levin", "Miri Regev", "Israel Katz", "Gideon Sa'ar", "Ofir Katz", "Talik Gvili", "Yoav Kisch", "Yaakov Bardugo", "Miki Zohar", "Almog Cohen", "Amichai Chikli", "Elisha Medan", "David Peter", "Moshe Saada", "Haim Katz", "Dudi Amsalem", "Eti Atiya", "Boaz Bismuth", "David Bitan", "Shlomo Karhi", "Nir Barkat", "Gila Gamliel", "Eli Goldschmidt", "Erez Tadmor", "Shlomo Lerner", "Itzik Bunzel", "Moshe Binyamin Peretz", "Shuki Ohana", "Ze'ev Elkin", "Amit Halevi", "Keren Atiass-Bublil", "Avihai Boaron", "Efi Nave", "Sharon Saada", "Hanoch Milwidsky", "Netanel Ohion", "May Golan"], "noam": ["Avi Maoz", "Shimon Tubul", "Eliyahu Libman", "Liora Alon", "Yaska Haimov", "Yair Avitan", "Eliyahu Ozen", "Meir Eylon", "Babed Elkana", "Eitan Vinberg"], "otzma": ["Itamar Ben-Gvir", "Tally Gotliv", "Yitzhak Wasserlauf", "Amihai Eliyahu", "Limor Son Har-Melech", "Yitzhak Kroizer", "Hanamel Dorfman", "Tzachi Eliyahu", "Yossi Goldberger", "Itiel Ne'eman", "David Babli", "Yishai Fleisher", "Shiran Mirzai", "Shimi Golan", "Yaniv Badelov", "Aychlutm Masala", "Gadi Mazuz", "Mordechai Prizis", "Aharon Amar", "Or Eliya Yomtobian"], "rz": ["Bezalel Smotrich", "Moshe Feiglin", "Orit Strook", "Simcha Rothman", "Tzvika Mor", "Itamar Eitam", "Zvi Sukkot", "Yitzhak Zaga", "Reut Ben Haim", "Omer Patziniach", "Arcady Mutter", "Ohad Tal", "Roei Kirshberg", "Omer Rahamim", "Sima Hasson", "Shmuel Sasson", "Shirel Lalum-Nahir", "Zvika Vishingrad", "Iris Bernstein", "Eitan Tam"], "reservists": ["Yoaz Hendel", "Yaron Zelekha", "Einat Wilf", "Haviv Volibovich", "Yoav Adomi", "Ofir Langman", "Shlomi Dimri", "Lior Gilboa", "Tehila Peretz", "Shalom Biton"], "shas": ["Aryeh Deri", "Yinon Azulai", "Michael Malchieli", "Yoav Ben-Tzur", "Haim Biton", "Dror Amos", "Moshe Abutbul", "Uriel Buso", "Yosef Taieb", "Yonatan Mishraki", "Yosef Alnathanov", "Erez Malul", "Semion Moshiashvili", "Uriel Cohen", "Israel Tzadka", "Rafael Nimni", "Moshe Ben-Naim", "Masiash Rafael Eran Avichai", "Ariel Asher", "Netanel Mor Yosef"], "together": ["Naftali Bennett", "Yair Lapid", "Keren Terner Eyal", "Meirav Ben-Ari", "Liran Avishar Ben-Horin", "Noam Tibon", "Michal Negri", "Eitan Ginzburg", "Meirav Cohen", "Yonatan Shalev", "Bruria Naim Arman", "Ram Ben-Barak", "Amir Strugo", "Naor Shiri", "Nissam Ze'evi", "Vladimir Beliak", "Orly Harel", "Yorai Lahav-Hertzanu", "Shahar Varon", "Yasmin Fridman", "Esti Ayalon Kobo", "Jeremy Saltan", "Neta Attias", "Tzvi Plotnitzky", "Moshe Tur-Paz", "Olessia Kantor", "Simon Davidson", "Mati Gill", "Tomer Wiener", "Shelly Tal Meron", "Tami Muziel", "Roni Malkai", "Yael Stern", "Matti Sarfati Harkavi", "Amit Barda"], "raam": ["Mansour Abbas", "Yoav Segalovitz", "Waleed Taha", "Waleed Alhwashla", "Iman Khatib-Yassin", "Yasir Hujeirat", "Ibrahim Al-Turi", "Abd El-Karim Masri", "Izzam Abd El-Karim", "Ibrahim Abu-Laben"], "utj": ["Ya'akov Asher", "Yitzhak Goldknopf", "Yitzhak Pindrus", "Meir Porush", "Moshe Rosenthal", "Elyakim Stark", "Yehuda Weisfish", "Ya'akov Tessler", "Dudi Zeltz", "David Ohana", "Moshe Roth", "Eliyahu Baruchi", "Israel Porush", "Yitzhak Reich", "Yosef Bahem", "Ya'akov Asher Guterman", "Yossi Daitsh", "Shmuel Greenberg", "Yehiel Aryeh Vinterberg", "Yitzhak Ravitz"], "yashar": ["Gadi Eisenkot", "Yoram Cohen", "Orit Farkash-Hacohen", "Adi Altschuler", "Matan Kahana", "Hili Tropper", "Shaul Meridor", "Tair Ifergan", "Oshrat Gani Gonen", "Shira Shapira", "Inbar Harush Gity", "Elazar Stern", "Kamil Abu Rokon", "Devorah Sharifian Bachar", "Alex Rif", "Inbar Yehezkeli", "Roy Folkman", "Israel Zari", "Tal Ohana", "Elisaf Peretz", "Yaffa Tabaja", "Nir Hagbi", "Ron Barkai", "Shay Fisher", "Lian Folk David", "Roee Cohen", "Ziv Rosen", "Jocelyn Bash", "Alon Futerman", "Tali Molner", "Gil Avriel", "Shiran Ben David Ozeri", "Eliran Aryeh", "Helen Gelber", "Shlomi Yehiav", "Hila Meir", "Ran Ben-Ariya Yitzkan", "May Sachs Elianna", "Gideon Zaga", "Moshe Davidovich"], "yb": ["Avigdor Lieberman", "Rafi Ben Shitrit", "Talya Lankri", "Oded Forer", "Yulia Malinovsky", "Sharon Sharabi", "Hamad Amar", "Evgeny Sova", "Elvira Kolihman", "Dan Illouz", "Lily Ben Ami", "Yael Benvenisti", "David Azoulay", "Limor Magen Telem", "Israel Ben Shitrit", "Sharon Roffe Ofir", "Mor Dekel", "Michaela Levin-Shamir", "Olivier Rafowicz", "Yaakov (Yanki) Mozes"]};
 const CANDIDATE_LISTS_SOURCE = "https://en.wikipedia.org/wiki/Party_lists_for_the_2026_Israeli_legislative_election";
@@ -1583,20 +1604,20 @@ function computeTrend() {
   coalitionTrendCache = null;
 }
 
-const COALITION_TREND_DRAWS = 1500;
+const TREND_DRAWS_PER_POINT = 4000;
 let coalitionTrendCache = null;
 let coalitionTrendChart = null;
 
 function chanceAtSnapshot({ parties, picked }) {
   let wins = 0;
-  for (let draw = 0; draw < COALITION_TREND_DRAWS; draw++) {
-    const seats = parties.map(sampleSeats);
+  for (let draw = 0; draw < TREND_DRAWS_PER_POINT; draw++) {
+    const seats = parties.map(v => sampleSeats({ v, draw }));
     const total = seats.reduce((a, b) => a + b, 0);
     if (total <= 0) continue;
     const pickedSeats = parties.reduce((a, v, i) => a + (picked.has(v.party.key) ? seats[i] : 0), 0);
     if ((pickedSeats / total) * 120 >= 60.5) wins++;
   }
-  return wins / COALITION_TREND_DRAWS;
+  return wins / TREND_DRAWS_PER_POINT;
 }
 
 function coalitionChanceOverTime(keys) {
@@ -1653,20 +1674,21 @@ function renderCoalitionTrend() {
   }
 }
 
-const PARTY_QUERY_DEFAULT = { key: "likud", seats: 25 };
+const PARTY_QUERY_DEFAULT = { key: "likud", seats: 25, goal: "seats" };
 let partyTrendCache = null;
 let partyTrendChart = null;
 
 function partySeatQuery() {
   const key = store.get("kmp-query-party", PARTY_QUERY_DEFAULT.key);
   const seats = Math.min(120, Math.max(1, Math.round(Number(store.get("kmp-query-seats", PARTY_QUERY_DEFAULT.seats)) || PARTY_QUERY_DEFAULT.seats)));
-  return { key, seats };
+  const goal = store.get("kmp-query-goal", PARTY_QUERY_DEFAULT.goal) === "pass" ? "pass" : "seats";
+  return { key, seats, goal };
 }
 
 function liveSeatsOf(key) {
   const { keys, draws } = simulatedKnessets();
   const index = keys.indexOf(key);
-  return index < 0 ? [] : draws.map(draw => Math.round(draw[index]));
+  return index < 0 ? [] : draws.map(draw => roundedSeats(draw[index]));
 }
 
 function chanceOfAtLeast({ seatsByDraw, seats }) {
@@ -1676,10 +1698,10 @@ function chanceOfAtLeast({ seatsByDraw, seats }) {
 function seatsByDrawAtSnapshot({ parties, key }) {
   const index = parties.findIndex(v => v.party.key === key);
   if (index < 0) return [];
-  return Array.from({ length: COALITION_TREND_DRAWS }, () => {
-    const drawn = parties.map(sampleSeats);
+  return Array.from({ length: TREND_DRAWS_PER_POINT }, (_, draw) => {
+    const drawn = parties.map(v => sampleSeats({ v, draw }));
     const total = drawn.reduce((a, b) => a + b, 0);
-    return total > 0 ? Math.round((drawn[index] / total) * 120) : 0;
+    return total > 0 ? roundedSeats((drawn[index] / total) * 120) : 0;
   });
 }
 
@@ -1692,7 +1714,7 @@ function partyTrendPoints({ key, seats }) {
   const lastIndex = trendData.snapshots.length - 1;
   const points = trendData.snapshots.map((snapshot, index) => {
     const seatsByDraw = index === lastIndex ? liveSeatsOf(key) : seatsByDrawAtSnapshot({ parties: snapshot.parties, key });
-    return { x: snapshot.t, averageSeats: averageSeatsOf(seatsByDraw), chance: chanceOfAtLeast({ seatsByDraw, seats }) };
+    return { x: snapshot.t, averageSeats: averageSeatsOf(seatsByDraw), chance: chanceOfAtLeast({ seatsByDraw, seats }), passChance: chanceOfAtLeast({ seatsByDraw, seats: 1 }) };
   });
   partyTrendCache = { cacheKey, points };
   return points;
@@ -1706,51 +1728,67 @@ function renderPartySeatQuery() {
   const partiesBySeats = [...rows].sort((a, b) => b.seats - a.seats);
   const selectedKey = partiesBySeats.some(r => r.v.party.key === query.key) ? query.key : partiesBySeats[0]?.v.party.key;
   partySelect.replaceChildren(...partiesBySeats.map(r => new Option(r.v.party.name, r.v.party.key, false, r.v.party.key === selectedKey)));
+  const isPassGoal = query.goal === "pass";
+  document.getElementById("queryGoal").value = query.goal;
+  document.getElementById("querySeatsFields").hidden = isPassGoal;
   const seatsInput = document.getElementById("querySeats");
   if (document.activeElement !== seatsInput) seatsInput.value = query.seats;
   const row = rows.find(r => r.v.party.key === selectedKey);
   if (!row) return;
 
   const seatsByDraw = liveSeatsOf(selectedKey);
-  const chance = chanceOfAtLeast({ seatsByDraw, seats: query.seats });
+  const passingDraws = seatsByDraw.filter(drawn => drawn > 0);
+  const passChance = passingDraws.length / Math.max(1, seatsByDraw.length);
+  const chance = isPassGoal ? passChance : chanceOfAtLeast({ seatsByDraw, seats: query.seats });
   const sortedSeats = [...seatsByDraw].sort((a, b) => a - b);
   const seatsAtShare = share => sortedSeats[Math.min(sortedSeats.length - 1, Math.floor(share * sortedSeats.length))] ?? 0;
-  const passChance = seatsByDraw.filter(drawn => drawn > 0).length / Math.max(1, seatsByDraw.length);
+  const runsText = `from ${SIMULATION_DRAWS.toLocaleString()} simulated results`;
   const chanceNumber = document.getElementById("queryChance");
   chanceNumber.textContent = chancePct(chance);
   chanceNumber.className = likelihoodClass(chance);
-  document.getElementById("queryText").textContent = `chance ${row.v.party.name} wins ${query.seats}+ seats, from ${SIMULATION_DRAWS.toLocaleString()} simulated results. Averages ${averageSeatsOf(seatsByDraw).toFixed(1)} seats; 8 in 10 results fall between ${seatsAtShare(0.1)} and ${seatsAtShare(0.9)}. Passes the threshold in ${chancePct(passChance)}.`;
+  document.getElementById("queryText").textContent = isPassGoal
+    ? `chance ${row.v.party.name} passes the ${THRESHOLD_PCT}% threshold, ${runsText}. ${passingDraws.length ? `When it passes it wins about ${averageSeatsOf(passingDraws).toFixed(1)} seats; otherwise it gets none and its votes are wasted.` : "It gets no seats in any of them."}`
+    : `chance ${row.v.party.name} wins ${query.seats}+ seats, ${runsText}. Averages ${averageSeatsOf(seatsByDraw).toFixed(1)} seats; 8 in 10 results fall between ${seatsAtShare(0.1)} and ${seatsAtShare(0.9)}. Passes the threshold in ${chancePct(passChance)}.`;
 
   const wrap = document.getElementById("queryTrendWrap");
   const points = typeof Chart !== "undefined" ? partyTrendPoints({ key: selectedKey, seats: query.seats }) : null;
   wrap.hidden = !points;
   if (!points) return;
-  document.getElementById("queryTrendTitle").textContent = `Average simulated seats over the last ${formatSpan(currentTrendWindow().spanMs)}, dashed line at ${query.seats}`;
+  const span = formatSpan(currentTrendWindow().spanMs);
+  document.getElementById("queryTrendTitle").textContent = isPassGoal
+    ? `Chance of passing the threshold over the last ${span}`
+    : `Average simulated seats over the last ${span}, dashed line at ${query.seats}`;
   const fg = cssVar("--muted"), grid = cssVar("--line");
   const partyColor = colors[selectedKey];
   const highestSeats = Math.max(query.seats, ...points.map(point => point.averageSeats));
+  const yScale = isPassGoal
+    ? { min: 0, max: 100, ticks: { color: fg, maxTicksLimit: 5, callback: value => `${value}%` }, grid: { color: grid } }
+    : { min: 0, suggestedMax: Math.ceil(highestSeats + 2), ticks: { color: fg, maxTicksLimit: 5 }, grid: { color: grid } };
+  const tooltipLabel = isPassGoal
+    ? item => `Chance of passing: ${item.parsed.y.toFixed(0)}%`
+    : item => [`Average seats: ${item.parsed.y.toFixed(1)}`, `Chance of ${query.seats}+: ${chancePct(points[item.dataIndex].chance)}`];
   const options = {
     responsive: true, maintainAspectRatio: false, animation: false,
     interaction: { mode: "index", intersect: false },
     scales: {
       x: { type: "linear", min: points[0].x, max: points.at(-1).x, ticks: { color: fg, maxTicksLimit: isPhoneWidth() ? 3 : 5, maxRotation: 0, callback: formatTrendTick }, grid: { display: false } },
-      y: { min: 0, suggestedMax: Math.ceil(highestSeats + 2), ticks: { color: fg, maxTicksLimit: 5 }, grid: { color: grid } },
+      y: yScale,
     },
     plugins: {
       legend: { display: false },
       tooltip: {
         filter: item => item.datasetIndex === 0,
-        callbacks: {
-          title: items => new Date(items[0].parsed.x).toLocaleString(),
-          label: item => [`Average seats: ${item.parsed.y.toFixed(1)}`, `Chance of ${query.seats}+: ${chancePct(points[item.dataIndex].chance)}`],
-        },
+        callbacks: { title: items => new Date(items[0].parsed.x).toLocaleString(), label: tooltipLabel },
       },
     },
   };
-  const datasets = [
-    { data: points.map(point => ({ x: point.x, y: point.averageSeats })), borderColor: partyColor, backgroundColor: partyColor, pointRadius: 0, borderWidth: 2, tension: 0.3 },
-    { data: [{ x: points[0].x, y: query.seats }, { x: points.at(-1).x, y: query.seats }], borderColor: fg, borderDash: [6, 4], borderWidth: 1, pointRadius: 0 },
-  ];
+  const lineStyle = { borderColor: partyColor, backgroundColor: partyColor, pointRadius: 0, borderWidth: 2, tension: 0.3 };
+  const datasets = isPassGoal
+    ? [{ ...lineStyle, data: points.map(point => ({ x: point.x, y: point.passChance * 100 })), backgroundColor: partyColor.replace(")", " / 0.18)"), fill: true }]
+    : [
+        { ...lineStyle, data: points.map(point => ({ x: point.x, y: point.averageSeats })) },
+        { data: [{ x: points[0].x, y: query.seats }, { x: points.at(-1).x, y: query.seats }], borderColor: fg, borderDash: [6, 4], borderWidth: 1, pointRadius: 0 },
+      ];
   if (partyTrendChart) {
     partyTrendChart.data.datasets = datasets;
     partyTrendChart.options = options;
@@ -1817,6 +1855,7 @@ const proxyInput = document.getElementById("proxy");
 proxyInput.value = store.get("kmp-proxy", "");
 proxyInput.addEventListener("change", () => { store.set("kmp-proxy", proxyInput.value); refresh(); });
 document.getElementById("queryParty").addEventListener("change", event => { store.set("kmp-query-party", event.target.value); renderPartySeatQuery(); });
+document.getElementById("queryGoal").addEventListener("change", event => { store.set("kmp-query-goal", event.target.value); renderPartySeatQuery(); });
 document.getElementById("querySeats").addEventListener("input", event => {
   if (event.target.value === "") return;
   store.set("kmp-query-seats", event.target.value);
