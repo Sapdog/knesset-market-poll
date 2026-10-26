@@ -49,6 +49,8 @@ h1 { font: 600 30px/1.1 var(--display); margin: 0; text-wrap: balance; }
 h2 { font: 600 13px/1.2 var(--body); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 12px; }
 h3 { font: 600 14px var(--body); margin: 0 0 6px; }
 .sub { color: var(--muted); margin: 4px 0 0; }
+.turnout b { color: var(--fg); font-family: var(--mono); }
+.turnout a { color: inherit; }
 .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 button, select { font: 500 14px var(--body); color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 7px 12px; cursor: pointer; }
 button:hover, select:hover { border-color: var(--accent); }
@@ -268,6 +270,7 @@ input[type=text] { font: 13px var(--mono); width: 100%; max-width: 420px; paddin
     <div>
       <h1>Knesset Market Poll</h1>
       <p class="sub">120 seats implied by prediction-market prices. Election day: 27 Oct 2026<span id="countdown"></span>.</p>
+      <p class="sub turnout" id="turnout" hidden></p>
     </div>
     <div class="controls">
       <label for="mode" class="status">Model</label>
@@ -421,7 +424,8 @@ const CLOB = "https://clob.polymarket.com";
 const KALSHI = "https://api.elections.kalshi.com/trade-api/v2";
 const MANIFOLD = "https://api.manifold.markets/v0";
 const POLY_TAGS = ["israel-election", "israeli-election", "israel-elections", "knesset", "israel"];
-const POLY_SEARCHES = ["Knesset seats", "Israel election seats", "Israeli legislative election", "Israel election vote share"];
+const POLY_SEARCHES = ["Knesset seats", "Israel election seats", "Israeli legislative election", "Israel election vote share", "Israeli election turnout"];
+const TURNOUT_2022_PCT = 70.6;
 const KALSHI_CARD_SERIES = ["KXISRAELBLOCMAJ", "KXISRAELBLOCMOST", "KXISRAELKNESSET", "KXISRAEL2ND", "KXISRAEL3RD", "KXISRAELGOVT", "KXISRAELPM"];
 const REFRESH_MS = 60 * 1000;
 const TREND_REFETCH_MS = 5 * 60 * 1000;
@@ -543,6 +547,7 @@ function blocOf(party) {
 
 function kindOf(title) {
   const t = String(title || "");
+  if (/turnout/i.test(t)) return "turnout";
   if (/vote share/i.test(t)) return "share";
   if (/wasted|below (the )?threshold/i.test(t)) return "wasted";
   if (/(#|number) of seats|how many seats/i.test(t)) return "seats";
@@ -768,7 +773,7 @@ function polyOutcomes(event) {
 }
 
 function polyCards(events) {
-  return events.filter(e => ["other", "passes"].includes(kindOf(e.title)) && liveMarkets(e).length).map(e => ({
+  return events.filter(e => ["other", "passes", "turnout"].includes(kindOf(e.title)) && liveMarkets(e).length).map(e => ({
     src: "Polymarket",
     title: e.title,
     url: `https://polymarket.com/event/${e.slug}`,
@@ -783,6 +788,21 @@ function polyEventPrice({ events, slugPattern, outcome }) {
   if (!event) return null;
   const match = polyOutcomes(event).find(o => outcome.test(o.label));
   return match && Number.isFinite(match.p) ? { p: match.p, url: `https://polymarket.com/event/${event.slug}` } : null;
+}
+
+function renderTurnout(turnout) {
+  const line = document.getElementById("turnout");
+  line.hidden = !turnout;
+  if (!turnout) return;
+  const marketLink = Object.assign(document.createElement("a"), { href: turnout.url, target: "_blank", rel: "noopener", textContent: "Polymarket" });
+  const likelyLabel = turnout.top.label.replace(/%?\+$/, "% or higher").replace(/^<\s*/, "under ");
+  line.replaceChildren(
+    "Expected turnout ",
+    Object.assign(document.createElement("b"), { textContent: `${turnout.expected.toFixed(1)}%` }),
+    " on ",
+    marketLink,
+    ` (2022: ${TURNOUT_2022_PCT}%). Most likely ${likelyLabel}, at ${chancePct(turnout.top.p)}.`,
+  );
 }
 
 async function refresh() {
@@ -800,6 +820,7 @@ async function refresh() {
     const logoByKey = {};
     const partyLogo = item => [item.icon, item.image].find(url => url && !/flag/i.test(url));
     let wastedPct = DEFAULT_WASTED_PCT;
+    let turnout = null;
     for (const e of events) {
       if (/win a seat|next israeli government/i.test(e.title || "")) {
         for (const m of liveMarkets(e)) logoByKey[identify(m.groupItemTitle || "").key] ??= partyLogo(m);
@@ -819,6 +840,9 @@ async function refresh() {
       } else if (kind === "wasted") {
         const s = summarise(polyBrackets(e, skipped), { integer: false });
         if (s) wastedPct = s.expected;
+      } else if (kind === "turnout") {
+        const s = summarise(polyBrackets(e, skipped), { integer: false });
+        if (s) turnout = { ...s, url: `https://polymarket.com/event/${e.slug}` };
       } else if (kind === "passes") {
         for (const m of liveMarkets(e)) directPass[identify(m.groupItemTitle || m.question || "").key] = polyPrice(m);
       }
@@ -830,9 +854,10 @@ async function refresh() {
     }
     const list = [...parties.values()].filter(v => v.seats || v.share);
     if (!list.length) throw new Error("no per-party seat or vote-share markets found");
-    lastData = { parties: list, events, skipped, wastedPct, at: new Date(), kalshi: lastData?.kalshi || null, extraCards: lastData?.extraCards || [] };
+    lastData = { parties: list, events, skipped, wastedPct, turnout, at: new Date(), kalshi: lastData?.kalshi || null, extraCards: lastData?.extraCards || [] };
     if (trendData?.series) computeTrend();
     render();
+    renderTurnout(turnout);
     status.textContent = `${list.length} parties · expected wasted vote ${wastedPct.toFixed(1)}% ·`;
     loadSideSources();
     if (!isLoadingTrend && (!trendData || Date.now() - trendData.at > TREND_REFETCH_MS)) loadTrend();
