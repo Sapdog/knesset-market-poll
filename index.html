@@ -548,6 +548,7 @@ function blocOf(party) {
 function kindOf(title) {
   const t = String(title || "");
   if (/turnout/i.test(t)) return "turnout";
+  if (/margin of victory|winning margin/i.test(t)) return "other";
   if (/vote share/i.test(t)) return "share";
   if (/wasted|below (the )?threshold/i.test(t)) return "wasted";
   if (/(#|number) of seats|how many seats/i.test(t)) return "seats";
@@ -790,6 +791,25 @@ function polyEventPrice({ events, slugPattern, outcome }) {
   return match && Number.isFinite(match.p) ? { p: match.p, url: `https://polymarket.com/event/${event.slug}` } : null;
 }
 
+function turnoutFromLadder(event) {
+  const rungs = liveMarkets(event)
+    .map(m => ({ atLeastPct: parseBracket(m.groupItemTitle || "")?.lo, chance: polyPrice(m) }))
+    .filter(rung => Number.isFinite(rung.atLeastPct))
+    .sort((a, b) => a.atLeastPct - b.atLeastPct);
+  if (!rungs.length) return null;
+  const brackets = [{ label: `under ${rungs[0].atLeastPct}%`, value: rungs[0].atLeastPct - 0.5, price: Math.max(0, 1 - rungs[0].chance) }];
+  rungs.forEach((rung, index) => {
+    const next = rungs[index + 1];
+    brackets.push(next
+      ? { label: `${rung.atLeastPct}–${next.atLeastPct}%`, value: (rung.atLeastPct + next.atLeastPct) / 2, price: Math.max(0, rung.chance - next.chance) }
+      : { label: `${rung.atLeastPct}%+`, value: rung.atLeastPct + 0.5, price: rung.chance });
+  });
+  const priceSum = brackets.reduce((a, b) => a + b.price, 0);
+  if (priceSum <= 0) return null;
+  for (const b of brackets) b.p = b.price / priceSum;
+  return { brackets, expected: brackets.reduce((a, b) => a + b.p * b.value, 0), top: brackets.reduce((a, b) => (b.p > a.p ? b : a)) };
+}
+
 function renderTurnout(turnout) {
   const line = document.getElementById("turnout");
   line.hidden = !turnout;
@@ -841,8 +861,9 @@ async function refresh() {
         const s = summarise(polyBrackets(e, skipped), { integer: false });
         if (s) wastedPct = s.expected;
       } else if (kind === "turnout") {
-        const s = summarise(polyBrackets(e, skipped), { integer: false });
-        if (s) turnout = { ...s, url: `https://polymarket.com/event/${e.slug}` };
+        const isLadder = /directional/i.test(e.title || "");
+        const s = isLadder ? turnoutFromLadder(e) : summarise(polyBrackets(e, skipped), { integer: false });
+        if (s && (isLadder || !turnout?.isLadder)) turnout = { ...s, isLadder, url: `https://polymarket.com/event/${e.slug}` };
       } else if (kind === "passes") {
         for (const m of liveMarkets(e)) directPass[identify(m.groupItemTitle || m.question || "").key] = polyPrice(m);
       }
